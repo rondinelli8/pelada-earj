@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pelada EARJ — Estatísticas</title>
+  <link rel="stylesheet" href="style_v2.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1>⚽ Pelada EARJ</h1>
+      <p class="subtitle">Estatísticas históricas — segundas-feiras na Escola Americana do Rio de Janeiro</p>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <div class="container">
+      <button class="tab-btn active" data-tab="rankings">Rankings</button>
+      <button class="tab-btn" data-tab="jogadores">Jogadores</button>
+      <button class="tab-btn" data-tab="partidas">Partidas</button>
+      <button class="tab-btn" data-tab="sobre">Sobre</button>
+    </div>
+  </nav>
+
+  <main class="container">
+
+    <!-- ════════════ RANKINGS ════════════ -->
+    <section id="tab-rankings" class="tab-panel active">
+      <div class="tab-with-sidebar">
+
+        <!-- Sidebar de anos -->
+        <aside class="year-sidebar" id="ranking-sidebar">
+          <div class="sidebar-header">
+            <button class="sidebar-toggle-btn" id="ranking-sidebar-toggle" title="Recolher">‹</button>
+            <span class="sidebar-heading">Temporadas</span>
+          </div>
+          <div class="sidebar-inner">
+            <nav id="ranking-sidebar-nav"></nav>
+          </div>
+        </aside>
+
+        <!-- Conteúdo principal -->
+        <div class="tab-main-content">
+          <div class="filters">
+            <div class="filter-group">
+              <label>Métrica</label>
+              <div id="filter-metrica" class="pill-group">
+                <button class="pill active" data-metrica="pontos">🏆 Pontos</button>
+                <button class="pill" data-metrica="gols">⚽ Gols</button>
+                <button class="pill" data-metrica="assists">👟 Assists</button>
+                <button class="pill" data-metrica="g_a">🎯 G+A</button>
+                <button class="pill" data-metrica="aproveitamento">📈 Aproveit.</button>
+                <button class="pill" data-metrica="aproveitamento_pior">📉 Pior Aprov.</button>
+                <button class="pill" data-metrica="jogos">🏟️ Jogos</button>
+              </div>
+            </div>
+            <div class="filter-group">
+              <label>Mostrar</label>
+              <div class="pill-group">
+                <button class="pill active" data-limite="10">Top 10</button>
+                <button class="pill" data-limite="20">Top 20</button>
+                <button class="pill" data-limite="0">Todos</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="ranking-meta" id="ranking-meta"></div>
+
+          <div class="ranking-grid">
+            <div class="ranking-block">
+
+              <!-- Toggle Jogadores / Goleiros -->
+              <div class="ranking-type-tabs">
+                <button class="ranking-type-btn active" data-tipo="linha">⚽ Jogadores de linha</button>
+                <button class="ranking-type-btn" data-tipo="goleiros">🧤 Goleiros</button>
+                <button class="ranking-type-btn" data-tipo="corrida">🏁 Corrida</button>
+              </div>
+
+              <!-- Painel: Jogadores de linha -->
+              <div id="panel-linha" class="ranking-type-panel">
+                <h2 id="ranking-title">🏆 Pontos — Geral</h2>
+                <table class="data-table" id="ranking-table">
+                  <thead>
+                    <tr>
+                      <th class="num">#</th>
+                      <th>Jogador</th>
+                      <th class="num">🏟️ J</th>
+                      <th class="num">✅ V</th>
+                      <th class="num">🤝 E</th>
+                      <th class="num">❌ D</th>
+                      <th class="num">⚽ G</th>
+                      <th class="num">👟 A</th>
+                      <th class="num">🏆 Pts</th>
+                      <th class="num">📈 %</th>
+                      <th>Forma</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+
+              <!-- Painel: Goleiros -->
+              <div id="panel-goleiros" class="ranking-type-panel" style="display:none">
+                <h2>🧤 Goleiros</h2>
+                <table class="data-table" id="goleiros-table">
+                  <thead>
+                    <tr>
+                      <th class="num">#</th>
+                      <th>Goleiro</th>
+                      <th class="num">J</th>
+                      <th class="num">V</th>
+                      <th class="num">E</th>
+                      <th class="num">D</th>
+                      <th class="num">🏆 Pts</th>
+                      <th class="num">📈 %</th>
+                      <th>Forma</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+
+            </div>
+
+              <!-- Painel: Corrida do Ranking -->
+              <div id="panel-corrida" class="ranking-type-panel" style="display:none">
+                <div id="corrida-chart-container"></div>
+              </div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════════ JOGADORES ════════════ -->
+    <section id="tab-jogadores" class="tab-panel">
+      <div class="filters" style="padding-top:12px; padding-bottom:12px; margin-top:24px; margin-bottom:16px;">
+        <div class="filter-group filter-group--grow">
+          <label for="busca-input">🔍 Buscar jogador</label>
+          <input id="busca-input" type="search" placeholder="Digite parte do nome…" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="jogadores-layout" id="jogadores-layout">
+        <div class="jogadores-list">
+          <table class="data-table" id="jogadores-table">
+            <thead>
+              <tr>
+                <th>Jogador</th>
+                <th class="num">🏟️ J</th>
+                <th class="num">🏆 Pts</th>
+                <th class="num">⚽ G</th>
+                <th class="num">👟 A</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <aside class="jogador-detalhe" id="jogador-detalhe">
+          <p class="placeholder">Selecione um jogador para ver o histórico completo.</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ════════════ PARTIDAS ════════════ -->
+    <section id="tab-partidas" class="tab-panel">
+      <div class="tab-with-sidebar">
+
+        <!-- Sidebar de anos/meses -->
+        <aside class="year-sidebar" id="partidas-sidebar">
+          <div class="sidebar-header">
+            <button class="sidebar-toggle-btn" id="partidas-sidebar-toggle" title="Recolher">‹</button>
+            <span class="sidebar-heading">Temporadas</span>
+          </div>
+          <div class="sidebar-inner">
+            <nav id="partidas-sidebar-nav"></nav>
+          </div>
+        </aside>
+
+        <!-- Conteúdo principal -->
+        <div class="tab-main-content">
+          <div class="filters" style="padding-top:12px; padding-bottom:12px; margin-bottom:20px;">
+            <div class="filter-group filter-group--grow">
+              <label for="busca-partida">🔍 Buscar (jogador ou data DD/MM/AAAA)</label>
+              <input id="busca-partida" type="search" placeholder="Ex: Rondinelli ou 30/03/2026" autocomplete="off" />
+            </div>
+          </div>
+
+          <div id="partidas-content"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════════ SOBRE ════════════ -->
+    <section id="tab-sobre" class="tab-panel">
+      <div class="prose-panel">
+        <article class="prose">
+          <h2>⚽ Sobre a Pelada EARJ</h2>
+          <p>
+            Toda segunda-feira, às 20h30, um grupo se reúne na Escola Americana do Rio de Janeiro
+            (EARJ) para o tradicional futebol entre os times <strong>Preto</strong> e
+            <strong>Branco</strong>. Esta página reúne o histórico de todas as partidas registradas
+            desde 2022.
+          </p>
+          <h3>Como ler os dados</h3>
+          <ul>
+            <li><strong>🏆 Pontos:</strong> 3 por vitória, 1 por empate, 0 por derrota.</li>
+            <li><strong>📈 Aproveitamento:</strong> % de pontos sobre o máximo possível (jogos × 3).</li>
+            <li><strong>🎯 G+A:</strong> soma de gols e assistências.</li>
+            <li><strong>Forma:</strong> últimas 5 partidas (✅ V · 🤝 E · ❌ D).</li>
+            <li>🧤 Goleiros aparecem em tabela separada nos rankings.</li>
+          </ul>
+          <h3>Atualização</h3>
+          <p id="sobre-meta">Carregando metadados…</p>
+          <p class="muted">
+            Mantido por Rafael Rondinelli a partir da planilha histórica
+            <code>fut earj_v3.xlsx</code>.
+          </p>
+        </article>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>⚽ Pelada EARJ — Atualizado em <span id="footer-data">—</span></span>
+    </div>
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="app_v2.js"></script>
+</body>
+</html>
