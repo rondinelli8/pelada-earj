@@ -149,10 +149,15 @@ function buildRankingSidebar() {
     const isActive = a === STATE.ranking.ano;
 
     const subItems = [
-      { metrica: 'pontos',  label: '🏆 Pontos' },
-      { metrica: 'gols',    label: '⚽ Gols' },
-      { metrica: 'assists', label: '👟 Assists' },
-      { metrica: 'g_a',     label: '🎯 G + A' },
+      { metrica: 'pontos',             label: '🏆 Pontos' },
+      { metrica: 'aproveitamento',     label: '📈 Aproveit.' },
+      { metrica: 'aproveitamento_pior',label: '📉 Pior Aprov.' },
+      { metrica: 'jogos',              label: '🏟️ Jogos' },
+      { metrica: null },  // separador
+      { metrica: 'gols',               label: '⚽ Gols' },
+      { metrica: 'assists',            label: '👟 Assists' },
+      { metrica: 'g_a',               label: '🎯 G+A' },
+      { metrica: 'g_a_jogo',          label: '🎯 G+A/J' },
     ];
     const limites = [
       { limite: 10, label: 'Top 10' },
@@ -161,7 +166,9 @@ function buildRankingSidebar() {
     ];
 
     const metricaBtns = subItems.map(s =>
-      `<button class="sidebar-sub-btn ${isActive && STATE.ranking.metrica === s.metrica ? 'active' : ''}"
+      s.metrica === null
+        ? `<span class="sidebar-sub-sep"></span>`
+        : `<button class="sidebar-sub-btn ${isActive && STATE.ranking.metrica === s.metrica ? 'active' : ''}"
         data-ano="${a}" data-metrica="${s.metrica}">${s.label}</button>`
     ).join('');
     const limiteBtns = limites.map(l =>
@@ -299,6 +306,7 @@ function renderRanking() {
       nome: j.nome, goleiro: j.goleiro,
       jogos: s.jogos, vitorias: s.vitorias, empates: s.empates, derrotas: s.derrotas,
       gols: s.gols, assists: s.assists, g_a: s.g_a,
+      g_a_jogo: s.jogos > 0 ? s.g_a / s.jogos : 0,
       pontos: s.pontos, aproveitamento: s.aproveitamento,
       partidas: j.partidas || [],
     };
@@ -317,7 +325,7 @@ function renderRanking() {
 
   const metricaLabels = {
     pontos: '🏆 Pontos', gols: '⚽ Gols', assists: '👟 Assistências',
-    g_a: '🎯 G + A', aproveitamento: '📈 Aproveitamento',
+    g_a: '🎯 G+A', g_a_jogo: '🎯 G+A/J', aproveitamento: '📈 Aproveitamento',
     aproveitamento_pior: '📉 Pior Aproveitamento', jogos: '🏟️ Jogos',
   };
   const anoTxt = ano === 'geral' ? 'Geral' : ano;
@@ -329,7 +337,7 @@ function renderRanking() {
 
   const tbody = document.querySelector('#ranking-table tbody');
   tbody.innerHTML = view.length === 0
-    ? `<tr><td colspan="11" class="empty-state">Nenhum dado para este filtro.</td></tr>`
+    ? `<tr><td colspan="13" class="empty-state">Nenhum dado para este filtro.</td></tr>`
     : view.map((p, i) => {
         const rankTd = (usarMedalhas && i < 3)
           ? `<td class="num rank-medal">${['🥇','🥈','🥉'][i]}</td>`
@@ -345,6 +353,8 @@ function renderRanking() {
           <td class="num">${p.derrotas}</td>
           <td class="num ${hl('gols')}">${p.gols}</td>
           <td class="num ${hl('assists')}">${p.assists}</td>
+          <td class="num ${hl('g_a')}">${p.g_a}</td>
+          <td class="num ${hl('g_a_jogo')}">${p.g_a_jogo.toFixed(2).replace('.', ',')}</td>
           <td class="num bold ${hl('pontos')}">${p.pontos}</td>
           <td class="num ${hl('aproveitamento') || hl('aproveitamento_pior')}">${p.aproveitamento.toFixed(1).replace('.', ',')}%</td>
           <td class="form-dots-cell"><div class="form-dots">${dots}</div></td>

@@ -202,6 +202,7 @@ body {
 .sidebar-sub-btn:hover { color: var(--text); }
 .sidebar-sub-btn.active { color: var(--accent); font-weight: 600; }
 .sidebar-sub-divider { height: 1px; background: var(--border); margin: 4px 0; }
+.sidebar-sub-sep { height: 1px; background: var(--border-strong); margin: 3px 0; opacity: 0.5; }
 
 /* ─── Filters ─── */
 .filters {
@@ -224,7 +225,11 @@ body {
   letter-spacing: 0.07em;
   color: var(--text-muted);
 }
-.pill-group { display: flex; flex-wrap: wrap; gap: 5px; }
+.pill-group { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+.pill-subgroup { display: flex; flex-direction: column; gap: 5px; }
+.pill-subgroup-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.pill-sep { width: 1px; align-self: stretch; background: var(--border-strong); margin: 0 2px; opacity: 0.4; }
+.pill-group-label { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.7; }
 .pill {
   background: var(--surface);
   border: 1px solid var(--border-strong);
@@ -276,13 +281,18 @@ input[type="search"]:focus {
 }
 
 /* ─── Data Tables ─── */
+/* Wrapper: scroll container + visual border */
+.table-scroll-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
   font-size: 13.5px;
 }
 .data-table thead th {
@@ -296,7 +306,47 @@ input[type="search"]:focus {
   letter-spacing: 0.04em;
   color: var(--text-muted);
   white-space: nowrap;
+  /* Sticky header */
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
+
+/* ─── Frozen cols: # e Jogador ─── */
+#ranking-table  th:nth-child(1), #ranking-table  td:nth-child(1),
+#goleiros-table th:nth-child(1), #goleiros-table td:nth-child(1) {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 36px;
+}
+#ranking-table  th:nth-child(2), #ranking-table  td:nth-child(2),
+#goleiros-table th:nth-child(2), #goleiros-table td:nth-child(2) {
+  position: sticky;
+  left: 36px;
+  z-index: 1;
+  box-shadow: 2px 0 5px -2px rgba(0,0,0,0.08);
+}
+/* Header intersection: acima das células sticky do body */
+#ranking-table  thead th:nth-child(1), #ranking-table  thead th:nth-child(2),
+#goleiros-table thead th:nth-child(1), #goleiros-table thead th:nth-child(2) {
+  z-index: 3;
+}
+/* Backgrounds explícitos para células sticky */
+#ranking-table  tbody td:nth-child(1), #ranking-table  tbody td:nth-child(2),
+#goleiros-table tbody td:nth-child(1), #goleiros-table tbody td:nth-child(2) { background: var(--surface); }
+#ranking-table  tbody tr:nth-child(even) td:nth-child(1),
+#ranking-table  tbody tr:nth-child(even) td:nth-child(2),
+#goleiros-table tbody tr:nth-child(even) td:nth-child(1),
+#goleiros-table tbody tr:nth-child(even) td:nth-child(2) { background: #fafaf8; }
+#ranking-table  tbody tr:hover td:nth-child(1),
+#ranking-table  tbody tr:hover td:nth-child(2),
+#goleiros-table tbody tr:hover td:nth-child(1),
+#goleiros-table tbody tr:hover td:nth-child(2) { background: var(--accent-soft) !important; }
+#ranking-table  tbody tr.selected td:nth-child(1),
+#ranking-table  tbody tr.selected td:nth-child(2),
+#goleiros-table tbody tr.selected td:nth-child(1),
+#goleiros-table tbody tr.selected td:nth-child(2) { background: var(--accent-soft) !important; }
 .data-table tbody td {
   padding: 10px 11px;
 }
@@ -768,23 +818,8 @@ input[type="search"]:focus {
   .sidebar-inner { width: 100%; }
   .sidebar-toggle-btn { font-size: 16px; padding: 0 6px; }
 
-  /* — Tabelas de ranking: scroll horizontal — */
-  .ranking-type-panel {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Ocultar colunas V/E/D e Forma no ranking para caber na tela */
-  #ranking-table  th:nth-child(4), #ranking-table  td:nth-child(4),
-  #ranking-table  th:nth-child(5), #ranking-table  td:nth-child(5),
-  #ranking-table  th:nth-child(6), #ranking-table  td:nth-child(6),
-  #ranking-table  th:nth-child(11),#ranking-table  td:nth-child(11),
-  #goleiros-table th:nth-child(4), #goleiros-table td:nth-child(4),
-  #goleiros-table th:nth-child(5), #goleiros-table td:nth-child(5),
-  #goleiros-table th:nth-child(6), #goleiros-table td:nth-child(6),
-  #goleiros-table th:nth-child(9), #goleiros-table td:nth-child(9) {
-    display: none;
-  }
+  /* — Tabelas de ranking: scroll via .table-scroll-wrap — */
+  .table-scroll-wrap { border-radius: var(--radius); }
 
   /* — Toggle Jogadores/Goleiros/Corrida: preenche a largura — */
   .ranking-type-tabs { width: 100%; }

@@ -44,15 +44,27 @@
         <div class="tab-main-content">
           <div class="filters">
             <div class="filter-group">
-              <label>Métrica</label>
+              <label>Filtro</label>
               <div id="filter-metrica" class="pill-group">
-                <button class="pill active" data-metrica="pontos">🏆 Pontos</button>
-                <button class="pill" data-metrica="gols">⚽ Gols</button>
-                <button class="pill" data-metrica="assists">👟 Assists</button>
-                <button class="pill" data-metrica="g_a">🎯 G+A</button>
-                <button class="pill" data-metrica="aproveitamento">📈 Aproveit.</button>
-                <button class="pill" data-metrica="aproveitamento_pior">📉 Pior Aprov.</button>
-                <button class="pill" data-metrica="jogos">🏟️ Jogos</button>
+                <div class="pill-subgroup">
+                  <span class="pill-group-label">Desempenho</span>
+                  <div class="pill-subgroup-row">
+                    <button class="pill active" data-metrica="pontos">🏆 Pontos</button>
+                    <button class="pill" data-metrica="aproveitamento">📈 Aproveit.</button>
+                    <button class="pill" data-metrica="aproveitamento_pior">📉 Pior Aprov.</button>
+                    <button class="pill" data-metrica="jogos">🏟️ Jogos</button>
+                  </div>
+                </div>
+                <span class="pill-sep"></span>
+                <div class="pill-subgroup">
+                  <span class="pill-group-label">Ataque</span>
+                  <div class="pill-subgroup-row">
+                    <button class="pill" data-metrica="gols">⚽ Gols</button>
+                    <button class="pill" data-metrica="assists">👟 Assists</button>
+                    <button class="pill" data-metrica="g_a">🎯 G+A</button>
+                    <button class="pill" data-metrica="g_a_jogo">🎯 G+A/J</button>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="filter-group">
@@ -80,6 +92,7 @@
               <!-- Painel: Jogadores de linha -->
               <div id="panel-linha" class="ranking-type-panel">
                 <h2 id="ranking-title">🏆 Pontos — Geral</h2>
+                <div class="table-scroll-wrap">
                 <table class="data-table" id="ranking-table">
                   <thead>
                     <tr>
@@ -91,6 +104,8 @@
                       <th class="num">❌ D</th>
                       <th class="num">⚽ G</th>
                       <th class="num">👟 A</th>
+                      <th class="num">🎯 G+A</th>
+                      <th class="num">🎯 /J</th>
                       <th class="num">🏆 Pts</th>
                       <th class="num">📈 %</th>
                       <th>Forma</th>
@@ -98,11 +113,13 @@
                   </thead>
                   <tbody></tbody>
                 </table>
+                </div>
               </div>
 
               <!-- Painel: Goleiros -->
               <div id="panel-goleiros" class="ranking-type-panel" style="display:none">
                 <h2>🧤 Goleiros</h2>
+                <div class="table-scroll-wrap">
                 <table class="data-table" id="goleiros-table">
                   <thead>
                     <tr>
@@ -119,6 +136,7 @@
                   </thead>
                   <tbody></tbody>
                 </table>
+                </div>
               </div>
 
             </div>
