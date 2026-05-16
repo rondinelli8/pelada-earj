@@ -357,6 +357,11 @@ input[type="search"]:focus {
 .data-table th.num { text-align: right; }
 .data-table .player-cell { font-weight: 500; }
 .data-table .clickable { cursor: pointer; }
+.data-table thead th.sortable { cursor: pointer; user-select: none; }
+.data-table thead th.sortable:hover { color: var(--accent); }
+.data-table thead th.sort-active { color: var(--accent); background: #eaf0fb; }
+.data-table thead th.sort-active::after { content: ' ↓'; font-size: 10px; }
+.data-table thead th.sort-active.sort-asc::after { content: ' ↑'; font-size: 10px; }
 .data-table .rank-cell {
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);

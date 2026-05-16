@@ -9,7 +9,7 @@ const MESES_PT = [
 ];
 
 const STATE = {
-  ranking: { ano: 'geral', metrica: 'pontos', limite: 10 },
+  ranking: { ano: 'geral', metrica: 'pontos', limite: 10, ordem: 'desc' },
   jogadores: { busca: '', selecionado: null },
   partidas:  { ano: 'todos', mes: 'todos', busca: '' },
 };
@@ -37,6 +37,7 @@ function init() {
   setupBuscaPartida();
   setupSidebarToggles();
   setupRankingTypeToggle();
+  setupHeaderSort();
 
   renderRanking();
   renderJogadores();
@@ -196,7 +197,7 @@ function buildRankingSidebar() {
 
     if (subBtn) {
       STATE.ranking.ano = subBtn.dataset.ano;
-      if (subBtn.dataset.metrica) STATE.ranking.metrica = subBtn.dataset.metrica;
+      if (subBtn.dataset.metrica) { STATE.ranking.metrica = subBtn.dataset.metrica; STATE.ranking.ordem = 'desc'; }
       if (subBtn.dataset.limite !== undefined) STATE.ranking.limite = parseInt(subBtn.dataset.limite, 10);
       syncRankingSidebar();
       syncMetricaPills();
@@ -261,6 +262,7 @@ function setupMetricaFilter() {
     const b = e.target.closest('button[data-metrica]');
     if (!b) return;
     STATE.ranking.metrica = b.dataset.metrica;
+    STATE.ranking.ordem   = 'desc';
     wrap.querySelectorAll('.pill').forEach(p => p.classList.toggle('active', p === b));
     syncRankingSidebar();
     renderRanking();
@@ -315,10 +317,11 @@ function renderRanking() {
 
   const minJogos = (metrica === 'aproveitamento' || metrica === 'aproveitamento_pior') ? 15 : 0;
   const sortKey  = metrica === 'aproveitamento_pior' ? 'aproveitamento' : metrica;
+  const ordem    = metrica === 'aproveitamento_pior' ? 'asc' : (STATE.ranking.ordem || 'desc');
   let sorted = linha.filter(p => p.jogos >= minJogos);
   sorted.sort((a, b) => {
     const va = a[sortKey] ?? 0, vb = b[sortKey] ?? 0;
-    if (metrica === 'aproveitamento_pior') return va - vb;
+    if (ordem === 'asc') return va !== vb ? va - vb : a.jogos - b.jogos;
     return vb !== va ? vb - va : b.jogos - a.jogos;
   });
   const view = limite > 0 ? sorted.slice(0, limite) : sorted;
@@ -327,6 +330,7 @@ function renderRanking() {
     pontos: '🏆 Pontos', gols: '⚽ Gols', assists: '👟 Assistências',
     g_a: '🎯 G+A', g_a_jogo: '🎯 G+A/J', aproveitamento: '📈 Aproveitamento',
     aproveitamento_pior: '📉 Pior Aproveitamento', jogos: '🏟️ Jogos',
+    vitorias: '✅ Vitórias', empates: '🤝 Empates', derrotas: '❌ Derrotas',
   };
   const anoTxt = ano === 'geral' ? 'Geral' : ano;
   document.getElementById('ranking-title').textContent =
@@ -387,6 +391,44 @@ function renderRanking() {
     const tr = e.target.closest('tr[data-jogador]');
     if (tr) abrirJogador(tr.dataset.jogador);
   };
+
+  // Indicadores visuais no cabeçalho
+  updateSortHeaders();
+}
+
+function updateSortHeaders() {
+  const metrica = STATE.ranking.metrica;
+  const ordem   = STATE.ranking.ordem;
+  document.querySelectorAll('#ranking-table thead th[data-sort]').forEach(th => {
+    th.classList.remove('sort-active', 'sort-asc');
+    if (th.dataset.sort === metrica ||
+        (metrica === 'aproveitamento_pior' && th.dataset.sort === 'aproveitamento')) {
+      th.classList.add('sort-active');
+      if (ordem === 'asc' || metrica === 'aproveitamento_pior') th.classList.add('sort-asc');
+    }
+  });
+}
+
+function setupHeaderSort() {
+  const thead = document.querySelector('#ranking-table thead');
+  if (!thead) return;
+  thead.addEventListener('click', e => {
+    const th = e.target.closest('th[data-sort]');
+    if (!th) return;
+    const col = th.dataset.sort;
+    if (STATE.ranking.metrica === col) {
+      // Mesmo col: toggle asc/desc
+      STATE.ranking.ordem = STATE.ranking.ordem === 'desc' ? 'asc' : 'desc';
+    } else {
+      STATE.ranking.metrica = col;
+      STATE.ranking.ordem   = 'desc';
+      // Sync pills: ativa o pill correspondente (se existir)
+      document.querySelectorAll('#filter-metrica .pill').forEach(p => {
+        p.classList.toggle('active', p.dataset.metrica === col);
+      });
+    }
+    renderRanking();
+  });
 }
 
 // ══════════════════════════════════════
