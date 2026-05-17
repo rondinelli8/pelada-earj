@@ -603,10 +603,16 @@ function renderSheetFiltros() {
 }
 
 function setupMobileSheets() {
+  // Elementos mobile podem não existir em versões antigas do index.html
+  const bar     = document.getElementById('mobile-bar');
+  const btnTemp = document.getElementById('mb-temporada');
+  const btnFilt = document.getElementById('mb-filtros');
+  const overlay = document.getElementById('mobile-overlay');
+  if (!bar || !btnTemp || !btnFilt || !overlay) return; // silencioso — sem crash
+
   // Mostrar/ocultar barra conforme aba ativa
   function syncBarVisibility() {
-    const bar = document.getElementById('mobile-bar');
-    const activeTab = document.querySelector('.tab-panel.active');
+    const activeTab  = document.querySelector('.tab-panel.active');
     const isRankings = activeTab && activeTab.id === 'tab-rankings';
     bar.classList.toggle('hidden', !isRankings);
   }
@@ -618,11 +624,11 @@ function setupMobileSheets() {
   syncBarVisibility();
 
   // Botões da barra
-  document.getElementById('mb-temporada').addEventListener('click', () => openMobileSheet('sheet-temporada'));
-  document.getElementById('mb-filtros').addEventListener('click',   () => openMobileSheet('sheet-filtros'));
+  btnTemp.addEventListener('click', () => openMobileSheet('sheet-temporada'));
+  btnFilt.addEventListener('click', () => openMobileSheet('sheet-filtros'));
 
   // Fechar ao clicar no overlay
-  document.getElementById('mobile-overlay').addEventListener('click', closeMobileSheets);
+  overlay.addEventListener('click', closeMobileSheets);
 
   updateMobileBar();
 }
@@ -1388,6 +1394,10 @@ function formatDataBR(iso) {
   if (!iso) return '—';
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
+}
+function escapeAttr(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 }
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c =>
