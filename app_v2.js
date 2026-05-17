@@ -9,7 +9,7 @@ const MESES_PT = [
 ];
 
 const STATE = {
-  ranking: { ano: 'geral', metrica: 'pontos', limite: 10, ordem: 'desc' },
+  ranking: { ano: 'geral', metrica: 'pontos', limite: 10, ordem: 'desc', tipo: 'linha' },
   jogadores: { busca: '', selecionado: null },
   partidas:  { ano: 'todos', mes: 'todos', busca: '' },
 };
@@ -38,6 +38,7 @@ function init() {
   setupSidebarToggles();
   setupRankingTypeToggle();
   setupHeaderSort();
+  setupMobileSheets();
 
   renderRanking();
   renderJogadores();
@@ -103,6 +104,7 @@ function setupRankingTypeToggle() {
       document.querySelectorAll('.ranking-type-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const tipo = btn.dataset.tipo;
+      STATE.ranking.tipo = tipo;
       document.getElementById('panel-linha').style.display    = tipo === 'linha'    ? '' : 'none';
       document.getElementById('panel-goleiros').style.display = tipo === 'goleiros' ? '' : 'none';
       const panelCorrida = document.getElementById('panel-corrida');
@@ -394,6 +396,8 @@ function renderRanking() {
 
   // Indicadores visuais no cabeçalho
   updateSortHeaders();
+  // Atualiza status da barra mobile
+  if (isMobile()) updateMobileBar();
 }
 
 function updateSortHeaders() {
@@ -429,6 +433,198 @@ function setupHeaderSort() {
     }
     renderRanking();
   });
+}
+
+// ══════════════════════════════════════
+//  Mobile — Bottom Bar + Sheets
+// ══════════════════════════════════════
+
+const METRICA_LABELS = {
+  pontos:            '🏆 Pontos',
+  aproveitamento:    '📈 Aproveit.',
+  aproveitamento_pior: '📉 Pior Aprov.',
+  jogos:             '🏟️ Jogos',
+  gols:              '⚽ Gols',
+  assists:           '👟 Assists',
+  g_a:               '🎯 G+A',
+  g_a_jogo:          '🎯 G+A/J',
+};
+
+function isMobile() { return window.innerWidth <= 768; }
+
+function closeMobileSheets() {
+  document.getElementById('mobile-overlay').classList.remove('open');
+  document.getElementById('sheet-temporada').classList.remove('open');
+  document.getElementById('sheet-filtros').classList.remove('open');
+}
+
+function openMobileSheet(id) {
+  // Preenche conteúdo antes de abrir
+  if (id === 'sheet-filtros')    renderSheetFiltros();
+  if (id === 'sheet-temporada')  renderSheetTemporada();
+  document.getElementById('mobile-overlay').classList.add('open');
+  document.getElementById(id).classList.add('open');
+}
+
+function updateMobileBar() {
+  const el = document.getElementById('mobile-bar-status');
+  if (!el) return;
+  const anoLabel    = STATE.ranking.ano === 'geral' ? 'Geral' : STATE.ranking.ano;
+  const limiteLabel = STATE.ranking.limite === 0 ? 'Todos' : `Top ${STATE.ranking.limite}`;
+  const metLabel    = METRICA_LABELS[STATE.ranking.metrica] || STATE.ranking.metrica;
+  el.textContent = `${metLabel} · ${limiteLabel} · ${anoLabel}`;
+}
+
+function renderSheetTemporada() {
+  const body = document.getElementById('sheet-temporada-body');
+  const anos = Object.keys(DATA.por_ano || {}).sort().reverse();
+  const lista = ['geral', ...anos];
+  body.innerHTML = `<div class="sheet-year-list">${
+    lista.map(a => `
+      <button class="sheet-year-btn${STATE.ranking.ano === a ? ' active' : ''}" data-ano="${a}">
+        ${a === 'geral' ? '🌐 Geral (todos os anos)' : `📅 ${a}`}
+      </button>`).join('')
+  }</div>`;
+  body.querySelectorAll('.sheet-year-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      STATE.ranking.ano   = btn.dataset.ano;
+      STATE.ranking.ordem = 'desc';
+      syncRankingSidebar();
+      renderRanking();
+      closeMobileSheets();
+      updateMobileBar();
+    });
+  });
+}
+
+function renderSheetFiltros() {
+  const body  = document.getElementById('sheet-filtros-body');
+  const tipo  = STATE.ranking.tipo;
+  const tipos = [
+    { k: 'linha',    label: '⚽ Jogadores' },
+    { k: 'goleiros', label: '🧤 Goleiros'  },
+    { k: 'corrida',  label: '🏁 Corrida'   },
+  ];
+  const grupos = [
+    { label: 'Desempenho', items: [
+      { k: 'pontos',             label: '🏆 Pontos'     },
+      { k: 'aproveitamento',     label: '📈 Aproveit.'  },
+      { k: 'aproveitamento_pior',label: '📉 Pior Aprov.'},
+      { k: 'jogos',              label: '🏟️ Jogos'      },
+    ]},
+    { label: 'Ataque', items: [
+      { k: 'gols',     label: '⚽ Gols'   },
+      { k: 'assists',  label: '👟 Assists' },
+      { k: 'g_a',      label: '🎯 G+A'   },
+      { k: 'g_a_jogo', label: '🎯 G+A/J' },
+    ]},
+  ];
+  const limites = [
+    { v: 10, label: 'Top 10' },
+    { v: 20, label: 'Top 20' },
+    { v: 0,  label: 'Todos'  },
+  ];
+
+  body.innerHTML = `
+    <div class="sheet-section">
+      <div class="sheet-section-label">Tipo de ranking</div>
+      <div class="sheet-tipo-row">
+        ${tipos.map(t => `
+          <button class="sheet-tipo-btn${tipo === t.k ? ' active' : ''}" data-tipo="${t.k}">${t.label}</button>
+        `).join('')}
+      </div>
+    </div>
+    ${grupos.map(g => `
+      <div class="sheet-section">
+        <div class="sheet-section-label">${g.label}</div>
+        <div class="sheet-pill-row">
+          ${g.items.map(it => `
+            <button class="sheet-pill${STATE.ranking.metrica === it.k ? ' active' : ''}" data-metrica="${it.k}">${it.label}</button>
+          `).join('')}
+        </div>
+      </div>
+    `).join('')}
+    <div class="sheet-section">
+      <div class="sheet-section-label">Mostrar</div>
+      <div class="sheet-pill-row">
+        ${limites.map(l => `
+          <button class="sheet-pill${STATE.ranking.limite === l.v ? ' active' : ''}" data-limite="${l.v}">${l.label}</button>
+        `).join('')}
+      </div>
+    </div>`;
+
+  // Tipo
+  body.querySelectorAll('.sheet-tipo-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const t = btn.dataset.tipo;
+      STATE.ranking.tipo = t;
+      // Sync desktop tabs
+      document.querySelectorAll('.ranking-type-btn').forEach(b => b.classList.toggle('active', b.dataset.tipo === t));
+      document.getElementById('panel-linha').style.display    = t === 'linha'    ? '' : 'none';
+      document.getElementById('panel-goleiros').style.display = t === 'goleiros' ? '' : 'none';
+      const pc = document.getElementById('panel-corrida');
+      if (pc) {
+        pc.style.display = t === 'corrida' ? '' : 'none';
+        if (t === 'corrida' && !pc.dataset.built) {
+          // dispara o click no desktop btn para construir o corrida chart
+          document.querySelector('.ranking-type-btn[data-tipo="corrida"]')?.click();
+          return;
+        }
+      }
+      renderRanking();
+      closeMobileSheets();
+      updateMobileBar();
+    });
+  });
+
+  // Métrica
+  body.querySelectorAll('.sheet-pill[data-metrica]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      STATE.ranking.metrica = btn.dataset.metrica;
+      STATE.ranking.ordem   = 'desc';
+      syncMetricaPills();
+      syncRankingSidebar();
+      renderRanking();
+      closeMobileSheets();
+      updateMobileBar();
+    });
+  });
+
+  // Limite
+  body.querySelectorAll('.sheet-pill[data-limite]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      STATE.ranking.limite = parseInt(btn.dataset.limite, 10);
+      syncLimitePills();
+      renderRanking();
+      closeMobileSheets();
+      updateMobileBar();
+    });
+  });
+}
+
+function setupMobileSheets() {
+  // Mostrar/ocultar barra conforme aba ativa
+  function syncBarVisibility() {
+    const bar = document.getElementById('mobile-bar');
+    const activeTab = document.querySelector('.tab-panel.active');
+    const isRankings = activeTab && activeTab.id === 'tab-rankings';
+    bar.classList.toggle('hidden', !isRankings);
+  }
+
+  // Observar mudança de aba
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => setTimeout(syncBarVisibility, 50));
+  });
+  syncBarVisibility();
+
+  // Botões da barra
+  document.getElementById('mb-temporada').addEventListener('click', () => openMobileSheet('sheet-temporada'));
+  document.getElementById('mb-filtros').addEventListener('click',   () => openMobileSheet('sheet-filtros'));
+
+  // Fechar ao clicar no overlay
+  document.getElementById('mobile-overlay').addEventListener('click', closeMobileSheets);
+
+  updateMobileBar();
 }
 
 // ══════════════════════════════════════
@@ -1198,4 +1394,3 @@ function escapeHtml(s) {
     ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;',
     "'":'&#39;' }[c]));
 }
-function escapeAttr(s) { return escapeHtml(s); }

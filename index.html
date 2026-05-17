@@ -248,6 +248,34 @@
     </div>
   </footer>
 
+  <!-- ════════════ MOBILE BAR ════════════ -->
+  <div class="mobile-bar hidden" id="mobile-bar">
+    <button class="mobile-bar-btn" id="mb-temporada">
+      <span class="mb-icon">📅</span>
+      <span class="mb-lbl">Temporada</span>
+    </button>
+    <div class="mobile-bar-status" id="mobile-bar-status"></div>
+    <button class="mobile-bar-btn" id="mb-filtros">
+      <span class="mb-icon">⚙️</span>
+      <span class="mb-lbl">Filtros</span>
+    </button>
+  </div>
+
+  <!-- ════════════ BOTTOM SHEETS ════════════ -->
+  <div class="mobile-overlay" id="mobile-overlay"></div>
+
+  <div class="mobile-sheet" id="sheet-temporada">
+    <div class="sheet-handle"></div>
+    <h3 class="sheet-title">📅 Temporada</h3>
+    <div class="sheet-body" id="sheet-temporada-body"></div>
+  </div>
+
+  <div class="mobile-sheet" id="sheet-filtros">
+    <div class="sheet-handle"></div>
+    <h3 class="sheet-title">⚙️ Filtros</h3>
+    <div class="sheet-body" id="sheet-filtros-body"></div>
+  </div>
+
   <script src="data.js"></script>
   <script src="app_v2.js"></script>
 </body>
