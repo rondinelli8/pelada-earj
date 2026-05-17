@@ -781,7 +781,7 @@ input[type="search"]:focus {
 .prose h3 { margin: 22px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 700; }
 .prose p { margin: 0 0 12px; }
 .prose ul { margin: 0 0 12px; padding-left: 22px; }
-.prose code { background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; font-family: var(--fo
+.prose code { background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; font-family: var(--font-mono); font-size: 0.85em; }
 /* ════════════════════════════════════════
    MOBILE  ≤ 640px
    (desktop não é afetado)
