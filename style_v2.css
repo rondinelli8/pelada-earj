@@ -825,8 +825,18 @@ input[type="search"]:focus {
   .sidebar-inner { width: 100%; }
   .sidebar-toggle-btn { font-size: 16px; padding: 0 6px; }
 
-  /* — Tabelas de ranking: scroll via .table-scroll-wrap — */
-  .table-scroll-wrap { border-radius: var(--radius); }
+  /* — Tabelas de ranking: container de scroll isolado — */
+  /* A tabela rola por conta própria (vertical + horizontal).
+     A página NÃO rola quando o usuário toca na tabela.
+     Sticky header e colunas congeladas funcionam dentro do container. */
+  #panel-linha    .table-scroll-wrap,
+  #panel-goleiros .table-scroll-wrap {
+    height: calc(100vh - 175px);
+    height: calc(100svh - 175px);   /* svh exclui chrome do browser no mobile */
+    overflow: auto;
+    overscroll-behavior: contain;   /* impede scroll da página ao atingir borda */
+    border-radius: 0;
+  }
 
   /* — Toggle Jogadores/Goleiros/Corrida: preenche a largura — */
   .ranking-type-tabs { width: 100%; }
