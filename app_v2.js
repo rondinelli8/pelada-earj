@@ -477,7 +477,7 @@ function updateMobileBar() {
 
 function renderSheetTemporada() {
   const body = document.getElementById('sheet-temporada-body');
-  const anos = Object.keys(DATA.por_ano || {}).sort().reverse();
+  const anos = (DATA.meta && DATA.meta.anos_disponiveis ? [...DATA.meta.anos_disponiveis].map(String).sort().reverse() : []);
   const lista = ['geral', ...anos];
   body.innerHTML = `<div class="sheet-year-list">${
     lista.map(a => `
