@@ -54,11 +54,9 @@ function init() {
 // ══════════════════════════════════════
 function setupTabs() {
   function syncBodyScroll(tabId) {
-    // No mobile: bloqueia scroll da <body> na aba Rankings para que
-    // o browser role apenas a tabela (que tem overflow:auto próprio).
-    if (isMobile()) {
-      document.body.style.overflow = (tabId === 'rankings') ? 'hidden' : '';
-    }
+    // overscroll-behavior: contain no .table-scroll-wrap isola o scroll da tabela.
+    // Não precisa bloquear body.overflow.
+    document.body.style.overflow = '';
   }
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -161,78 +159,13 @@ function buildRankingSidebar() {
   nav.innerHTML = anos.map(a => {
     const label = a === 'geral' ? 'Geral' : a;
     const isActive = a === STATE.ranking.ano;
-
-    const subItems = [
-      { metrica: 'pontos',             label: '🏆 Pontos' },
-      { metrica: 'aproveitamento',     label: '📈 Aproveit.' },
-      { metrica: 'aproveitamento_pior',label: '📉 Pior Aprov.' },
-      { metrica: 'jogos',              label: '🏟️ Jogos' },
-      { metrica: null },  // separador
-      { metrica: 'gols',               label: '⚽ Gols' },
-      { metrica: 'assists',            label: '👟 Assists' },
-      { metrica: 'g_a',               label: '🎯 G+A' },
-      { metrica: 'g_a_jogo',          label: '🎯 G+A/J' },
-    ];
-    const limites = [
-      { limite: 10, label: 'Top 10' },
-      { limite: 20, label: 'Top 20' },
-      { limite: 0,  label: 'Todos' },
-    ];
-
-    const metricaBtns = subItems.map(s =>
-      s.metrica === null
-        ? `<span class="sidebar-sub-sep"></span>`
-        : `<button class="sidebar-sub-btn ${isActive && STATE.ranking.metrica === s.metrica ? 'active' : ''}"
-        data-ano="${a}" data-metrica="${s.metrica}">${s.label}</button>`
-    ).join('');
-    const limiteBtns = limites.map(l =>
-      `<button class="sidebar-sub-btn ${isActive && STATE.ranking.limite === l.limite ? 'active' : ''}"
-        data-ano="${a}" data-limite="${l.limite}">${l.label}</button>`
-    ).join('');
-
-    return `
-      <div class="sidebar-year-item">
-        <button class="sidebar-year-btn ${isActive ? 'active' : ''}" data-ano="${a}">
-          <span class="chevron">${isActive ? '▾' : '▸'}</span>
-          <span>${label}</span>
-        </button>
-        <div class="sidebar-year-sub ${isActive ? 'open' : ''}">
-          ${metricaBtns}
-          <div class="sidebar-sub-divider"></div>
-          ${limiteBtns}
-        </div>
-      </div>`;
+    return `<button class="sidebar-year-btn ${isActive ? 'active' : ''}" data-ano="${a}">${label}</button>`;
   }).join('');
 
   nav.addEventListener('click', e => {
-    const subBtn = e.target.closest('.sidebar-sub-btn');
     const yearBtn = e.target.closest('.sidebar-year-btn');
-
-    if (subBtn) {
-      STATE.ranking.ano = subBtn.dataset.ano;
-      if (subBtn.dataset.metrica) { STATE.ranking.metrica = subBtn.dataset.metrica; STATE.ranking.ordem = 'desc'; }
-      if (subBtn.dataset.limite !== undefined) STATE.ranking.limite = parseInt(subBtn.dataset.limite, 10);
-      syncRankingSidebar();
-      syncMetricaPills();
-      syncLimitePills();
-      renderRanking();
-      return;
-    }
-
     if (yearBtn) {
-      const ano = yearBtn.dataset.ano;
-      STATE.ranking.ano = ano;
-      const item = yearBtn.closest('.sidebar-year-item');
-      const sub = item.querySelector('.sidebar-year-sub');
-      if (sub) {
-        // Fecha todos os outros, abre este
-        nav.querySelectorAll('.sidebar-year-sub').forEach(s => {
-          if (s !== sub) s.classList.remove('open');
-        });
-        nav.querySelectorAll('.sidebar-year-btn .chevron').forEach(c => { c.textContent = '▸'; });
-        sub.classList.toggle('open');
-        yearBtn.querySelector('.chevron').textContent = sub.classList.contains('open') ? '▾' : '▸';
-      }
+      STATE.ranking.ano = yearBtn.dataset.ano;
       syncRankingSidebar();
       renderRanking();
     }
@@ -244,13 +177,6 @@ function syncRankingSidebar() {
   if (!nav) return;
   nav.querySelectorAll('.sidebar-year-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.ano === STATE.ranking.ano);
-  });
-  nav.querySelectorAll('.sidebar-sub-btn').forEach(btn => {
-    let active = false;
-    if (btn.dataset.ano !== STATE.ranking.ano) { btn.classList.remove('active'); return; }
-    if (btn.dataset.metrica) active = btn.dataset.metrica === STATE.ranking.metrica;
-    else if (btn.dataset.limite !== undefined) active = parseInt(btn.dataset.limite) === STATE.ranking.limite;
-    btn.classList.toggle('active', active);
   });
 }
 

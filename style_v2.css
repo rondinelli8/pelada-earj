@@ -169,40 +169,12 @@ body {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  gap: 8px;
   transition: background 0.1s, color 0.1s;
   white-space: nowrap;
-}
-.sidebar-year-btn:hover { background: var(--accent-soft); color: var(--text); }
-.sidebar-year-btn.active { color: var(--text); font-weight: 600; }
-.sidebar-year-btn .chevron { font-size: 10px; flex-shrink: 0; width: 12px; text-align: center; }
-
-.sidebar-year-sub {
-  display: none;
-  flex-direction: column;
-  padding: 2px 0 6px 34px;
   border-bottom: 1px solid var(--border);
 }
-.sidebar-year-sub.open { display: flex; }
-
-.sidebar-sub-btn {
-  background: none;
-  border: none;
-  padding: 5px 8px 5px 0;
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  color: var(--text-muted);
-  transition: color 0.1s;
-  white-space: nowrap;
-}
-.sidebar-sub-btn:hover { color: var(--text); }
-.sidebar-sub-btn.active { color: var(--accent); font-weight: 600; }
-.sidebar-sub-divider { height: 1px; background: var(--border); margin: 4px 0; }
-.sidebar-sub-sep { height: 1px; background: var(--border-strong); margin: 3px 0; opacity: 0.5; }
+.sidebar-year-btn:hover { background: var(--accent-soft); color: var(--text); }
+.sidebar-year-btn.active { color: var(--accent); font-weight: 700; background: var(--accent-soft); }
 
 /* ─── Filters ─── */
 .filters {
