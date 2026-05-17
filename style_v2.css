@@ -286,7 +286,6 @@ input[type="search"]:focus {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
-  touch-action: pan-x pan-y;
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
@@ -834,7 +833,7 @@ input[type="search"]:focus {
     height: calc(100vh - 175px);
     height: calc(100svh - 175px);   /* svh exclui chrome do browser no mobile */
     overflow: auto;
-    overscroll-behavior: contain;   /* impede scroll da página ao atingir borda */
+    overscroll-behavior: contain;
     border-radius: 0;
   }
 
