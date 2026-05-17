@@ -286,6 +286,7 @@ input[type="search"]:focus {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
@@ -834,7 +835,14 @@ input[type="search"]:focus {
     height: calc(100svh - 175px);   /* svh exclui chrome do browser no mobile */
     overflow: auto;
     overscroll-behavior: contain;
+    touch-action: pan-x pan-y;
     border-radius: 0;
+  }
+
+  /* Garante overflow horizontal na tabela de ranking no mobile */
+  #ranking-table,
+  #goleiros-table {
+    min-width: 640px;
   }
 
   /* — Toggle Jogadores/Goleiros/Corrida: preenche a largura — */
@@ -1089,3 +1097,30 @@ input[type="search"]:focus {
     font-size: 16px;
   }
 }
+
+/* -- Player profile year filter ----------------------------------------- */
+.perfil-year-filter {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 12px 0 4px;
+}
+.perfil-year-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 5px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.perfil-year-btn:hover { color: var(--text); border-color: var(--border-strong); }
+.perfil-year-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+

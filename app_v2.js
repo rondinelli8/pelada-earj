@@ -43,7 +43,8 @@ function init() {
   renderRanking();
   renderJogadores();
   renderPartidas();
-  renderSobre();
+
+    renderSobre();
 
   document.getElementById('footer-data').textContent = formatDataBR(DATA.meta.atualizado_em);
 }
@@ -735,32 +736,45 @@ function voltarParaLista() {
     '<p class="placeholder">Selecione um jogador para ver o histórico completo.</p>';
 }
 
-function renderDetalheJogador(nome) {
+function renderDetalheJogador(nome, anoFiltro) {
+  anoFiltro = anoFiltro || 'geral';
   const j = DATA.jogadores[nome];
   const wrap = document.getElementById('jogador-detalhe');
   if (!j) { wrap.innerHTML = `<p class="placeholder">Jogador não encontrado.</p>`; return; }
 
   const role = j.goleiro ? 'Goleiro' : 'Jogador de linha';
-  const g = j.geral;
 
-  // Tabela por temporada
+  // Stats for selected period
+  const s = (anoFiltro === 'geral' || !j.por_ano[anoFiltro]) ? j.geral : j.por_ano[anoFiltro];
+
+  // Year pills
   const anosOrdenados = Object.keys(j.por_ano).sort((a, b) => Number(b) - Number(a));
+  const pillsHTML = ['geral', ...anosOrdenados].map(a =>
+    `<button class="perfil-year-btn ${a === anoFiltro ? 'active' : ''}" data-ano="${a}">${a === 'geral' ? 'Geral' : a}</button>`
+  ).join('');
+
+  // Tabela por temporada (always all years)
   const tabelaAno = anosOrdenados.map(a => {
-    const s = j.por_ano[a];
+    const ts = j.por_ano[a];
     return `<tr>
       <td>${a}</td>
-      <td class="num">${s.jogos}</td>
-      <td class="num">${s.vitorias}</td>
-      <td class="num">${s.empates}</td>
-      <td class="num">${s.derrotas}</td>
-      ${!j.goleiro ? `<td class="num">${s.gols}</td><td class="num">${s.assists}</td>` : ''}
-      <td class="num bold">${s.pontos}</td>
-      <td class="num">${s.aproveitamento.toFixed(1).replace('.', ',')}%</td>
+      <td class="num">${ts.jogos}</td>
+      <td class="num">${ts.vitorias}</td>
+      <td class="num">${ts.empates}</td>
+      <td class="num">${ts.derrotas}</td>
+      ${!j.goleiro ? `<td class="num">${ts.gols}</td><td class="num">${ts.assists}</td>` : ''}
+      <td class="num bold">${ts.pontos}</td>
+      <td class="num">${ts.aproveitamento.toFixed(1).replace('.', ',')}%</td>
     </tr>`;
   }).join('');
 
-  // Histórico de partidas
-  const partidas = j.partidas.slice(0, 200).map(p => {
+  // Historico de partidas (filtered by year)
+  const todasPartidas = j.partidas;
+  const partidasFiltradas = anoFiltro === 'geral'
+    ? todasPartidas
+    : todasPartidas.filter(p => String(p.ano) === String(anoFiltro));
+  const partidasExibidas = partidasFiltradas.slice(0, 200);
+  const partidas = partidasExibidas.map(p => {
     const timeCls = p.time === 'Preto' ? 'badge-preto' : 'badge-branco';
     const timeIcon = p.time === 'Preto' ? '⚫' : '⚪';
     return `<tr>
@@ -783,46 +797,50 @@ function renderDetalheJogador(nome) {
     <h2>${escapeHtml(j.nome.replace(' (Goleiro)', ''))}</h2>
     <span class="role">${role}</span>
 
+    <div class="perfil-year-filter">
+      ${pillsHTML}
+    </div>
+
     <div class="kpi-grid-v2">
       <div class="kpi-v2">
         <span class="kpi-icon-v2">🏟️</span>
-        <span class="kpi-value-v2">${g.jogos}</span>
+        <span class="kpi-value-v2">${s.jogos}</span>
         <span class="kpi-label-v2">Jogos</span>
       </div>
       <div class="kpi-v2 kpi-accent">
         <span class="kpi-icon-v2">🏆</span>
-        <span class="kpi-value-v2">${g.pontos}</span>
+        <span class="kpi-value-v2">${s.pontos}</span>
         <span class="kpi-label-v2">Pontos</span>
       </div>
       <div class="kpi-v2">
         <span class="kpi-icon-v2">✅</span>
-        <span class="kpi-value-v2">${g.vitorias}</span>
+        <span class="kpi-value-v2">${s.vitorias}</span>
         <span class="kpi-label-v2">Vitórias</span>
       </div>
       <div class="kpi-v2">
         <span class="kpi-icon-v2">🤝</span>
-        <span class="kpi-value-v2">${g.empates}</span>
+        <span class="kpi-value-v2">${s.empates}</span>
         <span class="kpi-label-v2">Empates</span>
       </div>
       <div class="kpi-v2">
         <span class="kpi-icon-v2">❌</span>
-        <span class="kpi-value-v2">${g.derrotas}</span>
+        <span class="kpi-value-v2">${s.derrotas}</span>
         <span class="kpi-label-v2">Derrotas</span>
       </div>
       ${!j.goleiro ? `
       <div class="kpi-v2">
         <span class="kpi-icon-v2">⚽</span>
-        <span class="kpi-value-v2">${g.gols}</span>
+        <span class="kpi-value-v2">${s.gols}</span>
         <span class="kpi-label-v2">Gols</span>
       </div>
       <div class="kpi-v2">
         <span class="kpi-icon-v2">👟</span>
-        <span class="kpi-value-v2">${g.assists}</span>
+        <span class="kpi-value-v2">${s.assists}</span>
         <span class="kpi-label-v2">Assists</span>
       </div>` : ''}
       <div class="kpi-v2 kpi-clickable" id="kpi-aproveitamento" title="Clique para ver evolução do aproveitamento">
         <span class="kpi-icon-v2">📈</span>
-        <span class="kpi-value-v2">${g.aproveitamento.toFixed(1).replace('.', ',')}%</span>
+        <span class="kpi-value-v2">${s.aproveitamento.toFixed(1).replace('.', ',')}%</span>
         <span class="kpi-label-v2">Aprov. <span class="kpi-hint">▾</span></span>
       </div>
     </div>
@@ -847,7 +865,7 @@ function renderDetalheJogador(nome) {
     </div>
 
     <div class="detalhe-section">
-      <h3>Histórico de partidas (${j.partidas.length})${j.partidas.length > 200 ? ' — mostrando 200 mais recentes' : ''}</h3>
+      <h3>Histórico de partidas (${partidasFiltradas.length})${partidasFiltradas.length > 200 ? ' — mostrando 200 mais recentes' : ''}</h3>
       <table class="data-table">
         <thead><tr>
           <th>Data</th>
@@ -862,7 +880,15 @@ function renderDetalheJogador(nome) {
     </div>
   `;
 
-  // Toggle gráfico de aproveitamento
+  // Year filter pills — re-render with selected year
+  wrap.querySelector('.perfil-year-filter').addEventListener('click', e => {
+    const btn = e.target.closest('.perfil-year-btn');
+    if (!btn) return;
+    renderDetalheJogador(nome, btn.dataset.ano);
+    wrap.scrollTop = 0;
+  });
+
+  // Toggle grafico de aproveitamento
   const kpiAprov = document.getElementById('kpi-aproveitamento');
   const chartWrap = document.getElementById('aprov-chart-wrap');
   if (kpiAprov && chartWrap) {
@@ -874,7 +900,6 @@ function renderDetalheJogador(nome) {
       } else {
         if (!chartWrap.dataset.built) {
           chartWrap.innerHTML = buildAprovChartHTML(j.partidas);
-          // Filtro por ano: delegação de evento
           chartWrap.querySelector('.aprov-year-filter').addEventListener('click', e => {
             const btn = e.target.closest('.aprov-year-btn');
             if (!btn) return;
