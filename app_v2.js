@@ -606,34 +606,39 @@ function renderSheetFiltros() {
 
 function setupMobileTableScroll() {
   // No mobile, o browser confunde scroll horizontal da tabela com scroll vertical da página.
-  // Este handler detecta a direção do toque e toma controle quando for horizontal.
+  // Usamos delta incremental entre eventos consecutivos para evitar o problema de trava.
   document.querySelectorAll('.table-scroll-wrap').forEach(wrap => {
-    let startX = 0, startY = 0, startScrollLeft = 0, startScrollTop = 0;
-    let direcao = null; // null=indefinida, 'h'=horizontal, 'v'=vertical
+    let lastX = 0, lastY = 0;
+    let initX = 0, initY = 0;   // posição ao iniciar o toque
+    let direcao = null;          // null=indefinida, 'h'=horizontal, 'v'=vertical
 
     wrap.addEventListener('touchstart', e => {
-      startX         = e.touches[0].clientX;
-      startY         = e.touches[0].clientY;
-      startScrollLeft = wrap.scrollLeft;
-      startScrollTop  = wrap.scrollTop;
-      direcao        = null;
+      initX  = lastX = e.touches[0].clientX;
+      initY  = lastY = e.touches[0].clientY;
+      direcao = null;
     }, { passive: true });
 
     wrap.addEventListener('touchmove', e => {
-      const dx = startX - e.touches[0].clientX;
-      const dy = startY - e.touches[0].clientY;
+      const curX = e.touches[0].clientX;
+      const curY = e.touches[0].clientY;
 
-      // Determina direção na primeira leitura com movimento relevante (>4px)
-      if (direcao === null && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
-        direcao = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+      // Determina direção uma única vez, com ao menos 6px de deslocamento total
+      if (direcao === null) {
+        const totalDx = Math.abs(curX - initX);
+        const totalDy = Math.abs(curY - initY);
+        if (totalDx > 6 || totalDy > 6) {
+          direcao = totalDx > totalDy ? 'h' : 'v';
+        }
       }
 
       if (direcao === 'h') {
-        // Swipe horizontal: impede página de rolar e move a tabela
         e.preventDefault();
-        wrap.scrollLeft = startScrollLeft + dx;
+        wrap.scrollLeft += lastX - curX;
       }
-      // Swipe vertical: deixa o browser cuidar (rola a tabela, não a página)
+      // Swipe vertical: browser cuida naturalmente
+
+      lastX = curX;
+      lastY = curY;
     }, { passive: false });
   });
 }
