@@ -688,7 +688,7 @@ function renderDetalheJogador(nome, anoFiltro) {
       <td class="num">${ts.vitorias}</td>
       <td class="num">${ts.empates}</td>
       <td class="num">${ts.derrotas}</td>
-      ${!j.goleiro ? `<td class="num">${ts.gols}</td><td class="num">${ts.assists}</td>` : ''}
+      ${!j.goleiro ? `<td class="num">${ts.gols}</td><td class="num">${ts.assists}</td><td class="num">${ts.gols + ts.assists}</td><td class="num">${ts.jogos > 0 ? ((ts.gols + ts.assists) / ts.jogos).toFixed(2).replace('.', ',') : '—'}</td>` : ''}
       <td class="num bold">${ts.pontos}</td>
       <td class="num">${ts.aproveitamento.toFixed(1).replace('.', ',')}%</td>
     </tr>`;
@@ -713,7 +713,7 @@ function renderDetalheJogador(nome, anoFiltro) {
     </tr>`;
   }).join('');
 
-  const golosColHead = !j.goleiro ? `<th class="num">⚽ G</th><th class="num">👟 A</th>` : '';
+  const golosColHead = !j.goleiro ? `<th class="num">⚽ G</th><th class="num">👟 A</th><th class="num">🎯 G+A</th><th class="num">🎯 G+A/J</th>` : '';
 
   wrap.innerHTML = `
     <div class="detalhe-header">
