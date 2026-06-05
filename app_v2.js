@@ -74,8 +74,13 @@ function init() {
   renderPartidas();
   renderSobre();
   renderRecordes();
+  renderComparar();
 
   document.getElementById('footer-data').textContent = formatDataBR(DATA.meta.atualizado_em);
+
+  const _ultimaPartida = formatDataBR(DATA.meta.ultima_partida);
+  document.getElementById('footer-ultima-partida').textContent = _ultimaPartida;
+  document.getElementById('header-ultima-partida').textContent = _ultimaPartida;
 
   // Escuta mudanças de hash (botão voltar do browser, link externo)
   window.addEventListener('hashchange', onHashChange);
@@ -749,7 +754,8 @@ function renderRanking() {
 
   const metaTxt = `${sorted.length} jogador${sorted.length === 1 ? '' : 'es'} de linha` +
     (minJogos > 0 ? ` (≥ ${minJogos} jogos)` : '') +
-    (totalPartidas !== null ? ` · ${totalPartidas} partidas na temporada` : '');
+    (totalPartidas !== null ? ` · ${totalPartidas} partidas na temporada` : '') +
+    ` · Última partida: ${formatDataBR(DATA.meta.ultima_partida)}`;
   document.getElementById('ranking-meta').textContent = metaTxt;
 
   // Mostrar/ocultar coluna de presença
@@ -1973,12 +1979,17 @@ function renderPartidaCard(p) {
 // ══════════════════════════════════════
 //  Head-to-Head
 // ══════════════════════════════════════
-function computeH2H(nome1, nome2) {
+function computeH2H(nome1, nome2, anoFiltro) {
   const j1 = DATA.jogadores[nome1];
   const j2 = DATA.jogadores[nome2];
   const map1 = new Map(j1.partidas.map(p => [p.data, p]));
   const map2 = new Map(j2.partidas.map(p => [p.data, p]));
-  const comuns = [...map1.keys()].filter(d => map2.has(d));
+  let comuns = [...map1.keys()].filter(d => map2.has(d));
+
+  // Filtro de ano
+  if (anoFiltro && anoFiltro !== 'geral') {
+    comuns = comuns.filter(d => d.startsWith(anoFiltro + '-'));
+  }
 
   const r = { total: comuns.length, mesmo_time: 0, opostos: 0,
               j1: {v:0,e:0,d:0,pts:0,gols:0,assists:0},
@@ -1988,27 +1999,52 @@ function computeH2H(nome1, nome2) {
     const p1 = map1.get(dt), p2 = map2.get(dt);
     r.j1.gols    += p1.gols;    r.j2.gols    += p2.gols;
     r.j1.assists += p1.assists; r.j2.assists += p2.assists;
-    if (p1.time === p2.time) {
+    const t1 = p1.time || '';
+    const t2 = p2.time || '';
+    if (!t1 || !t2 || t1 === t2) {
       r.mesmo_time++;
     } else {
       r.opostos++;
-      r.j1.v += p1.resultado==='V'?1:0; r.j1.e += p1.resultado==='E'?1:0;
-      r.j1.d += p1.resultado==='D'?1:0; r.j1.pts += p1.pontos;
-      r.j2.v += p2.resultado==='V'?1:0; r.j2.e += p2.resultado==='E'?1:0;
-      r.j2.d += p2.resultado==='D'?1:0; r.j2.pts += p2.pontos;
+      let res1 = p1.resultado || deduceResultado(p1);
+      let res2 = p2.resultado || deduceResultado(p2);
+      if (!res1 && res2) res1 = res2==='V'?'D':res2==='D'?'V':'E';
+      if (!res2 && res1) res2 = res1==='V'?'D':res1==='D'?'V':'E';
+      const opp = {'V':'D','D':'V','E':'E'};
+      if (res1 && res2 && opp[res1] !== res2) {
+        const ded1 = deduceResultado(p1);
+        const ded2 = deduceResultado(p2);
+        if (ded1) { res1 = ded1; res2 = opp[ded1]; }
+        else if (ded2) { res2 = ded2; res1 = opp[ded2]; }
+      }
+      r.j1.v += res1==='V'?1:0; r.j1.e += res1==='E'?1:0;
+      r.j1.d += res1==='D'?1:0; r.j1.pts += (res1==='V'?3:res1==='E'?1:0);
+      r.j2.v += res2==='V'?1:0; r.j2.e += res2==='E'?1:0;
+      r.j2.d += res2==='D'?1:0; r.j2.pts += (res2==='V'?3:res2==='E'?1:0);
     }
   }
   return r;
 }
 
-function renderH2H(nome1, nome2) {
+function deduceResultado(p) {
+  if (p.placar_p == null || p.placar_b == null) return '';
+  const isPP = (p.time === 'Preto');
+  const golosPro    = isPP ? p.placar_p : p.placar_b;
+  const golosContra = isPP ? p.placar_b : p.placar_p;
+  if (golosPro > golosContra) return 'V';
+  if (golosPro < golosContra) return 'D';
+  return 'E';
+}
+
+function renderH2H(nome1, nome2, anoFiltro) {
   const el = document.getElementById('h2h-result');
   if (!el) return;
   if (!nome1 || !nome2 || nome1 === nome2) { el.innerHTML = ''; return; }
+  anoFiltro = anoFiltro || 'geral';
 
-  const g1  = DATA.jogadores[nome1].geral;
-  const g2  = DATA.jogadores[nome2].geral;
-  const h2h = computeH2H(nome1, nome2);
+  const ano = anoFiltro === 'geral' ? null : anoFiltro;
+  const g1  = (ano && DATA.jogadores[nome1].por_ano[ano]) ? DATA.jogadores[nome1].por_ano[ano] : DATA.jogadores[nome1].geral;
+  const g2  = (ano && DATA.jogadores[nome2].por_ano[ano]) ? DATA.jogadores[nome2].por_ano[ano] : DATA.jogadores[nome2].geral;
+  const h2h = computeH2H(nome1, nome2, anoFiltro);
 
   function pct(v1, v2) {
     const t = v1 + v2;
@@ -2182,16 +2218,38 @@ function renderRecordes() {
     </div>`;
 
 
-  // ── H2H section ──────────────────────────────────────────────────
-  const h2hJogs = linhaJogs
-    .filter(j => j.geral.jogos >= 5)
+  // Clique nos cards de jogador → navega para o perfil
+  wrap.querySelectorAll('.rec-card--link').forEach(card => {
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', () => {
+      const nome = card.dataset.jogador;
+      document.querySelector('[data-tab="jogadores"]').click();
+      setTimeout(() => abrirJogador(nome), 60);
+    });
+  });
+}
+
+// ══════════════════════════════════════
+//  Aba Comparar (H2H)
+// ══════════════════════════════════════
+function renderComparar() {
+  const wrap = document.getElementById('comparar-content');
+  if (!wrap || !DATA) return;
+
+  const linhaJogs = Object.values(DATA.jogadores)
+    .filter(j => !j.goleiro && j.geral.jogos >= 5)
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  const h2hOpts = h2hJogs.map(j =>
+
+  const h2hOpts = linhaJogs.map(j =>
     `<option value="${j.nome}">${j.nome} (${j.geral.jogos}j)</option>`).join('');
 
-  wrap.innerHTML += `
+  const anos = DATA.meta.anos_disponiveis.slice().reverse();
+  const anoPills = ['geral', ...anos.map(String)].map((a, i) =>
+    `<button class="pill${i===0?' active':''}" data-ano="${a}">${a === 'geral' ? 'Geral' : a}</button>`
+  ).join('');
+
+  wrap.innerHTML = `
     <div class="h2h-section">
-      <h3 class="rec-section-title h2h-title">⚔️ Comparação Head-to-Head</h3>
       <div class="h2h-selectors">
         <select id="h2h-j1" class="h2h-select">
           <option value="">Escolha o jogador 1…</option>${h2hOpts}
@@ -2201,21 +2259,28 @@ function renderRecordes() {
           <option value="">Escolha o jogador 2…</option>${h2hOpts}
         </select>
       </div>
+      <div class="h2h-ano-bar">
+        <span class="mes-filter-label">📅 Período:</span>
+        <div class="pill-group h2h-ano-pills">${anoPills}</div>
+      </div>
       <div id="h2h-result"></div>
     </div>`;
 
+  let anoAtivo = 'geral';
+
   const sel1 = document.getElementById('h2h-j1');
   const sel2 = document.getElementById('h2h-j2');
-  sel1.addEventListener('change', () => renderH2H(sel1.value, sel2.value));
-  sel2.addEventListener('change', () => renderH2H(sel1.value, sel2.value));
+  const triggerRender = () => renderH2H(sel1.value, sel2.value, anoAtivo);
 
-  // Clique nos cards de jogador → navega para o perfil
-  wrap.querySelectorAll('.rec-card--link').forEach(card => {
-    card.style.cursor = 'pointer';
-    card.addEventListener('click', () => {
-      const nome = card.dataset.jogador;
-      document.querySelector('[data-tab="jogadores"]').click();
-      setTimeout(() => abrirJogador(nome), 60);
+  sel1.addEventListener('change', triggerRender);
+  sel2.addEventListener('change', triggerRender);
+
+  wrap.querySelectorAll('.h2h-ano-pills .pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      wrap.querySelectorAll('.h2h-ano-pills .pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      anoAtivo = btn.dataset.ano;
+      triggerRender();
     });
   });
 }

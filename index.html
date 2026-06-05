@@ -70,6 +70,7 @@
       <div class="site-header-text">
         <h1>Pelada EARJ</h1>
         <p class="subtitle">Estatísticas históricas — segundas-feiras na Escola Americana do Rio de Janeiro</p>
+        <p class="header-ultima-partida">Última partida: <span id="header-ultima-partida">—</span></p>
       </div>
       <button class="dark-toggle" id="dark-toggle" title="Alternar modo escuro" aria-label="Alternar modo escuro">🌙</button>
     </div>
@@ -81,6 +82,7 @@
       <button class="tab-btn" data-tab="jogadores">Jogadores</button>
       <button class="tab-btn" data-tab="partidas">Partidas</button>
       <button class="tab-btn" data-tab="recordes">Recordes</button>
+      <button class="tab-btn" data-tab="comparar">Comparar</button>
       <button class="tab-btn" data-tab="sobre">Sobre</button>
     </div>
   </nav>
@@ -305,6 +307,14 @@
       <div id="recordes-content" class="rec-outer"></div>
     </section>
 
+    <!-- ════════════ COMPARAR ════════════ -->
+    <section id="tab-comparar" class="tab-panel">
+      <div class="prose-panel" style="padding-top:28px; padding-bottom:60px">
+        <h2 style="margin-bottom:16px">⚔️ Comparação Head-to-Head</h2>
+        <div id="comparar-content"></div>
+      </div>
+    </section>
+
     <!-- ════════════ SOBRE ════════════ -->
     <section id="tab-sobre" class="tab-panel">
       <div class="prose-panel">
@@ -338,7 +348,7 @@
 
   <footer class="site-footer">
     <div class="container">
-      <span>⚽ Pelada EARJ — Atualizado em <span id="footer-data">—</span></span>
+      <span>⚽ Pelada EARJ — Atualizado em <span id="footer-data">—</span> · Última partida: <span id="footer-ultima-partida">—</span></span>
     </div>
   </footer>
 

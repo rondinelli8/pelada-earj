@@ -73,6 +73,12 @@ body {
   font-size: 13px;
   color: var(--text-muted);
 }
+.header-ultima-partida {
+  margin: 3px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.75;
+}
 
 /* ─── Dark mode toggle ─── */
 .dark-toggle {
@@ -1331,6 +1337,17 @@ input[type="search"]:focus {
 @media (max-width: 480px) {
   .dest-indiv-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Comparar tab ── */
+#tab-comparar .h2h-section { margin-top: 0; padding-top: 0; border-top: none; }
+.h2h-ano-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 20px;
+  flex-wrap: wrap;
+}
+.h2h-ano-pills { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* ════════════════════════════════════════
    DARK MODE
