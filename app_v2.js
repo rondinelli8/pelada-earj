@@ -1,4 +1,4 @@
-/* ===== Pelada EARJ v2 — app_v2.js ===== */
+/* ===== Pelada EARJ v3 — app_v2.js ===== */
 'use strict';
 
 let DATA = null;
@@ -9,10 +9,34 @@ const MESES_PT = [
 ];
 
 const STATE = {
-  ranking: { ano: 'geral', metrica: 'pontos', limite: 10, ordem: 'desc', tipo: 'linha' },
+  ranking: { ano: 'geral', metrica: 'pontos', limite: 10, ordem: 'desc', tipo: 'linha', mes: 'todos' },
   jogadores: { busca: '', selecionado: null },
   partidas:  { ano: 'todos', mes: 'todos', busca: '' },
+  destaques: { ano: null }, // null = ano mais recente
 };
+
+// ══════════════════════════════════════
+//  Empty states — SVG + título + sub
+// ══════════════════════════════════════
+const _ES_SVG = {
+  search:   '<svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="21" cy="21" r="13" stroke="currentColor" stroke-width="2.5"/><path d="M30 30L44 44" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M17 21H25" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M21 17V25" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  person:   '<svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="26" cy="18" r="9" stroke="currentColor" stroke-width="2.5"/><path d="M8 46c0-9.941 8.059-18 18-18s18 8.059 18 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>',
+  calendar: '<svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="10" width="40" height="36" rx="4" stroke="currentColor" stroke-width="2.5"/><path d="M6 22H46" stroke="currentColor" stroke-width="2.5"/><path d="M16 6V14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M36 6V14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M20 34L32 34" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M26 28L26 40" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.4"/></svg>',
+  warning:  '<svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M26 5L49 46H3L26 5Z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M26 21V32" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><circle cx="26" cy="39" r="2" fill="currentColor"/></svg>',
+};
+
+function _emptyBlock(type, title, sub) {
+  return `<div class="empty-state-block">
+    <div class="esb-icon">${_ES_SVG[type] || _ES_SVG.search}</div>
+    <p class="esb-title">${title}</p>
+    ${sub ? `<p class="esb-sub">${sub}</p>` : ''}
+  </div>`;
+}
+function _emptyTd(colspan, type, title, sub) {
+  return `<tr><td colspan="${colspan}" class="empty-state-td">${_emptyBlock(type, title, sub)}</td></tr>`;
+}
+
+
 
 // ══════════════════════════════════════
 //  Boot
@@ -23,7 +47,7 @@ if (typeof window.PELADA_DATA !== 'undefined') {
 } else {
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('main.container').innerHTML =
-      '<div class="empty-state">Erro ao carregar dados: data.js não encontrado</div>';
+      _emptyBlock("warning", "Erro ao carregar dados", "O arquivo data.js não foi encontrado");
   });
 }
 
@@ -39,36 +63,416 @@ function init() {
   setupRankingTypeToggle();
   setupHeaderSort();
   setupMobileSheets();
+  setupDestaques();
+  setupMesFilter();
+
+  // Aplica hash da URL ANTES do primeiro render
+  applyHash();
 
   renderRanking();
   renderJogadores();
   renderPartidas();
-
-    renderSobre();
+  renderSobre();
+  renderRecordes();
 
   document.getElementById('footer-data').textContent = formatDataBR(DATA.meta.atualizado_em);
+
+  // Escuta mudanças de hash (botão voltar do browser, link externo)
+  window.addEventListener('hashchange', onHashChange);
+}
+
+// ══════════════════════════════════════
+//  Hash Router — URLs compartilháveis
+// ══════════════════════════════════════
+// Formatos suportados:
+//   #/rankings                         → aba Rankings, defaults
+//   #/rankings/2025                    → aba Rankings, ano 2025
+//   #/rankings/2025/gols              → aba Rankings, ano 2025, métrica gols
+//   #/rankings/2025/gols/goleiros     → aba Rankings, ano 2025, métrica gols, tipo goleiros
+//   #/jogador/Rafael+Rondinelli       → aba Jogadores, abre perfil
+//   #/jogador/Rafael+Rondinelli/2025  → aba Jogadores, perfil filtrado por ano
+//   #/partidas                         → aba Partidas
+//   #/partidas/2025                    → aba Partidas, ano 2025
+//   #/partidas/2025/03                → aba Partidas, ano 2025, mês 03
+//   #/sobre                            → aba Sobre
+
+let _hashUpdating = false; // flag para evitar loop hashchange ↔ pushHash
+
+function buildHash() {
+  const activeTab = document.querySelector('.tab-btn.active');
+  const tab = activeTab ? activeTab.dataset.tab : 'rankings';
+
+  if (tab === 'rankings') {
+    const { ano, metrica, tipo } = STATE.ranking;
+    let h = '#/rankings';
+    if (ano !== 'geral') {
+      h += '/' + ano;
+      if (metrica !== 'pontos') h += '/' + metrica;
+      else if (tipo !== 'linha') h += '/pontos';
+      if (tipo !== 'linha') h += '/' + tipo;
+    } else if (metrica !== 'pontos' || tipo !== 'linha') {
+      h += '/geral';
+      if (metrica !== 'pontos') h += '/' + metrica;
+      else if (tipo !== 'linha') h += '/pontos';
+      if (tipo !== 'linha') h += '/' + tipo;
+    }
+    return h;
+  }
+
+  if (tab === 'jogadores') {
+    const sel = STATE.jogadores.selecionado;
+    if (sel) {
+      let h = '#/jogador/' + encodeURIComponent(sel);
+      // Se há ano filtrado, pegar do DOM
+      const activeYearBtn = document.querySelector('.perfil-year-filter .perfil-year-btn.active');
+      if (activeYearBtn && activeYearBtn.dataset.ano !== 'geral') {
+        h += '/' + activeYearBtn.dataset.ano;
+      }
+      return h;
+    }
+    return '#/jogadores';
+  }
+
+  if (tab === 'partidas') {
+    const { ano, mes } = STATE.partidas;
+    let h = '#/partidas';
+    if (ano !== 'todos') {
+      h += '/' + ano;
+      if (mes !== 'todos') h += '/' + mes;
+    }
+    return h;
+  }
+
+  return '#/sobre';
+}
+
+function pushHash() {
+  const h = buildHash();
+  if (location.hash !== h) {
+    _hashUpdating = true;
+    history.replaceState(null, '', h);
+    _hashUpdating = false;
+  }
+}
+
+function applyHash() {
+  const hash = location.hash;
+  if (!hash || hash.length < 2) return;
+
+  const parts = hash.slice(2).split('/'); // remove '#/'
+  const route = parts[0];
+
+  if (route === 'rankings') {
+    activateTab('rankings');
+    if (parts[1]) {
+      STATE.ranking.ano = parts[1];
+      syncRankingSidebar();
+    }
+    if (parts[2]) {
+      STATE.ranking.metrica = parts[2];
+      STATE.ranking.ordem = parts[2] === 'aproveitamento_pior' ? 'asc' : 'desc';
+      syncMetricaPills();
+    }
+    if (parts[3]) {
+      STATE.ranking.tipo = parts[3];
+      // Sync tipo toggle
+      document.querySelectorAll('.ranking-type-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.tipo === parts[3]);
+      });
+      document.getElementById('panel-linha').style.display    = parts[3] === 'linha'    ? '' : 'none';
+      document.getElementById('panel-goleiros').style.display = parts[3] === 'goleiros' ? '' : 'none';
+      const pc = document.getElementById('panel-corrida');
+      if (pc) pc.style.display = parts[3] === 'corrida' ? '' : 'none';
+    }
+    return;
+  }
+
+  if (route === 'jogador' && parts[1]) {
+    activateTab('jogadores');
+    const nome = decodeURIComponent(parts[1]);
+    const anoFiltro = parts[2] || 'geral';
+    // Defer para depois do render inicial
+    setTimeout(() => {
+      STATE.jogadores.selecionado = nome;
+      document.getElementById('jogadores-layout').classList.add('player-selected');
+      renderJogadores();
+      renderDetalheJogador(nome, anoFiltro);
+    }, 0);
+    return;
+  }
+
+  if (route === 'jogadores') {
+    activateTab('jogadores');
+    return;
+  }
+
+  if (route === 'partidas') {
+    activateTab('partidas');
+    if (parts[1]) {
+      STATE.partidas.ano = parts[1];
+      STATE.partidas.mes = parts[2] || 'todos';
+      syncPartidasSidebar();
+    }
+    return;
+  }
+
+  if (route === 'sobre') {
+    activateTab('sobre');
+    return;
+  }
+}
+
+function onHashChange() {
+  if (_hashUpdating) return;
+  applyHash();
+  renderRanking();
+  renderJogadores();
+  renderPartidas();
+  if (isMobile()) updateMobileBar();
+}
+
+function activateTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+}
+
+// ══════════════════════════════════════
+//  Destaques da temporada
+// ══════════════════════════════════════
+function computeStatsByFilter(ano, mes) {
+  // Filtra partidas pelo ano e mês
+  let partidas = DATA.partidas;
+  if (ano && ano !== 'geral') partidas = partidas.filter(p => String(p.ano) === String(ano));
+  if (mes && mes !== 'todos') partidas = partidas.filter(p => p.data.slice(5, 7) === mes);
+
+  const totalPartidas = partidas.length;
+  let totalGols = 0, totalAssists = 0;
+  const playerStats = {};
+
+  partidas.forEach(p => {
+    Object.values(p.times).forEach(time => {
+      time.forEach(j => {
+        totalGols += j.gols || 0;
+        totalAssists += j.assists || 0;
+        if (!playerStats[j.nome]) {
+          playerStats[j.nome] = { nome: j.nome, jogos: 0, pontos: 0, gols: 0, assists: 0, vitorias: 0, empates: 0, derrotas: 0, goleiro: false };
+        }
+        const s = playerStats[j.nome];
+        s.jogos++;
+        s.gols += j.gols || 0;
+        s.assists += j.assists || 0;
+        if (j.resultado === 'V') { s.pontos += 3; s.vitorias++; }
+        else if (j.resultado === 'E') { s.pontos += 1; s.empates++; }
+        else { s.derrotas++; }
+      });
+    });
+  });
+
+  // Marcar goleiros
+  Object.values(DATA.jogadores).forEach(j => {
+    if (j.goleiro && playerStats[j.nome]) playerStats[j.nome].goleiro = true;
+  });
+
+  // Separar linha e goleiros
+  const linha = Object.values(playerStats).filter(p => !p.goleiro);
+
+  // Calcular aproveitamento
+  linha.forEach(p => {
+    p.aproveitamento = p.jogos > 0 ? (p.pontos / (p.jogos * 3)) * 100 : 0;
+    p.g_a = p.gols + p.assists;
+  });
+
+  // Rankings
+  const artilheiro = linha.slice().sort((a, b) => b.gols - a.gols)[0];
+  const maisJogos = linha.slice().sort((a, b) => b.jogos - a.jogos)[0];
+  const maisAssists = linha.slice().sort((a, b) => b.assists - a.assists)[0];
+
+  // Mínimo de jogos para aproveitamento: proporcional ao total de partidas
+  // Temporada completa (>= 30 partidas): 15 jogos. Senão: ~40% das partidas (mín 3)
+  let minJogosAprov;
+  if (mes && mes !== 'todos') {
+    minJogosAprov = 3;
+  } else if (totalPartidas >= 30) {
+    minJogosAprov = 15;
+  } else {
+    minJogosAprov = Math.max(3, Math.round(totalPartidas * 0.4));
+  }
+
+  const melhorAprov = linha.filter(p => p.jogos >= minJogosAprov)
+    .sort((a, b) => b.aproveitamento - a.aproveitamento)[0];
+  const maisGA = linha.slice().sort((a, b) => b.g_a - a.g_a)[0];
+  const maiorPontuacao = linha.slice().sort((a, b) => b.pontos - a.pontos)[0];
+
+  return {
+    totalPartidas,
+    totalGols,
+    totalAssists,
+    totalJogadores: linha.length,
+    golsPorJogo: totalPartidas > 0 ? (totalGols / totalPartidas) : 0,
+    assistsPorJogo: totalPartidas > 0 ? (totalAssists / totalPartidas) : 0,
+    artilheiro,
+    maisJogos,
+    maisAssists,
+    melhorAprov,
+    maisGA,
+    maiorPontuacao,
+  };
+}
+
+function setupDestaques() {
+  const section = document.getElementById('destaques-section');
+  if (!section) return;
+
+  // Ano mais recente como default
+  const anos = DATA.meta.anos_disponiveis.slice().sort((a, b) => b - a);
+  STATE.destaques.ano = String(anos[0]);
+
+  // Renderizar pills de ano
+  const pillsWrap = document.getElementById('destaques-ano-pills');
+  pillsWrap.innerHTML = anos.map(a =>
+    `<button class="dest-ano-btn ${String(a) === STATE.destaques.ano ? 'active' : ''}" data-ano="${a}">${a}</button>`
+  ).join('');
+
+  pillsWrap.addEventListener('click', e => {
+    const btn = e.target.closest('.dest-ano-btn');
+    if (!btn) return;
+    STATE.destaques.ano = btn.dataset.ano;
+    pillsWrap.querySelectorAll('.dest-ano-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('destaques-ano-label').textContent = btn.dataset.ano;
+    renderDestaques();
+  });
+
+  section.style.display = '';
+  renderDestaques();
+}
+
+function renderDestaques() {
+  const ano = STATE.destaques.ano;
+  const stats = computeStatsByFilter(ano, 'todos');
+
+  document.getElementById('destaques-ano-label').textContent = ano;
+
+  // Cards de stats gerais
+  const grid = document.getElementById('destaques-grid');
+  grid.innerHTML = `
+    <div class="dest-card">
+      <span class="dest-card-icon">🏟️</span>
+      <span class="dest-card-value">${stats.totalPartidas}</span>
+      <span class="dest-card-label">Partidas</span>
+    </div>
+    <div class="dest-card">
+      <span class="dest-card-icon">⚽</span>
+      <span class="dest-card-value">${stats.totalGols}</span>
+      <span class="dest-card-sub">${stats.golsPorJogo.toFixed(1).replace('.', ',')} por jogo</span>
+      <span class="dest-card-label">Gols</span>
+    </div>
+    <div class="dest-card">
+      <span class="dest-card-icon">👟</span>
+      <span class="dest-card-value">${stats.totalAssists}</span>
+      <span class="dest-card-sub">${stats.assistsPorJogo.toFixed(1).replace('.', ',')} por jogo</span>
+      <span class="dest-card-label">Assistências</span>
+    </div>
+    <div class="dest-card">
+      <span class="dest-card-icon">👥</span>
+      <span class="dest-card-value">${stats.totalJogadores}</span>
+      <span class="dest-card-label">Jogadores</span>
+    </div>
+  `;
+
+  // Destaques individuais
+  const indiv = document.getElementById('destaques-individuais');
+  const items = [
+    { icon: '⚽', label: 'Artilheiro', data: stats.artilheiro, fmt: p => `${p.gols} gols` },
+    { icon: '🏆', label: 'Maior pontuação', data: stats.maiorPontuacao, fmt: p => `${p.pontos} pts` },
+    { icon: '🏟️', label: 'Mais jogos', data: stats.maisJogos, fmt: p => `${p.jogos} jogos` },
+    { icon: '👟', label: 'Mais assistências', data: stats.maisAssists, fmt: p => `${p.assists} assists` },
+    { icon: '🎯', label: 'Mais participações', data: stats.maisGA, fmt: p => `${p.g_a} G+A` },
+    { icon: '📈', label: 'Melhor aproveitamento', data: stats.melhorAprov, fmt: p => `${p.aproveitamento.toFixed(1).replace('.', ',')}%` },
+  ].filter(it => it.data);
+
+  indiv.innerHTML = `<div class="dest-indiv-grid">${items.map(it =>
+    `<div class="dest-indiv-item clickable" data-jogador="${escapeAttr(it.data.nome)}">
+      <span class="dest-indiv-icon">${it.icon}</span>
+      <div class="dest-indiv-info">
+        <span class="dest-indiv-label">${it.label}</span>
+        <span class="dest-indiv-name">${escapeHtml(it.data.nome.replace(' (Goleiro)', ''))}</span>
+        <span class="dest-indiv-stat">${it.fmt(it.data)}</span>
+      </div>
+    </div>`
+  ).join('')}</div>`;
+
+  // Click handler para abrir jogador
+  indiv.onclick = e => {
+    const el = e.target.closest('[data-jogador]');
+    if (el) abrirJogador(el.dataset.jogador);
+  };
+}
+
+// ══════════════════════════════════════
+//  Filtro por mês no ranking
+// ══════════════════════════════════════
+function setupMesFilter() {
+  const bar = document.getElementById('mes-filter-bar');
+  const pills = document.getElementById('mes-filter-pills');
+  if (!bar || !pills) return;
+
+  pills.addEventListener('click', e => {
+    const btn = e.target.closest('.mes-pill');
+    if (!btn) return;
+    STATE.ranking.mes = btn.dataset.mes;
+    pills.querySelectorAll('.mes-pill').forEach(b => b.classList.toggle('active', b === btn));
+    renderRanking();
+  });
+}
+
+function updateMesFilter() {
+  const bar = document.getElementById('mes-filter-bar');
+  const pills = document.getElementById('mes-filter-pills');
+  if (!bar || !pills) return;
+
+  const ano = STATE.ranking.ano;
+  if (ano === 'geral') {
+    bar.style.display = 'none';
+    STATE.ranking.mes = 'todos';
+    return;
+  }
+
+  // Encontrar meses disponíveis para este ano
+  const meses = new Set();
+  DATA.partidas.forEach(p => {
+    if (String(p.ano) === ano) meses.add(p.data.slice(5, 7));
+  });
+  const sorted = [...meses].sort();
+
+  if (sorted.length <= 1) {
+    bar.style.display = 'none';
+    STATE.ranking.mes = 'todos';
+    return;
+  }
+
+  bar.style.display = '';
+  const MESES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  pills.innerHTML =
+    `<button class="mes-pill ${STATE.ranking.mes === 'todos' ? 'active' : ''}" data-mes="todos">Todos</button>` +
+    sorted.map(m =>
+      `<button class="mes-pill ${STATE.ranking.mes === m ? 'active' : ''}" data-mes="${m}">${MESES_ABREV[parseInt(m, 10) - 1]}</button>`
+    ).join('');
 }
 
 // ══════════════════════════════════════
 //  Tabs
 // ══════════════════════════════════════
 function setupTabs() {
-  function syncBodyScroll(tabId) {
-    // overscroll-behavior: contain no .table-scroll-wrap isola o scroll da tabela.
-    // Não precisa bloquear body.overflow.
-    document.body.style.overflow = '';
-  }
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-      syncBodyScroll(btn.dataset.tab);
+      pushHash();
+      if (isMobile()) updateMobileBar();
     });
   });
-  // Estado inicial: Rankings é a aba default
-  syncBodyScroll('rankings');
 }
 
 // ══════════════════════════════════════
@@ -156,16 +560,25 @@ function buildRankingSidebar() {
   if (!nav) return;
   const anos = ['geral', ...DATA.meta.anos_disponiveis.slice().reverse().map(String)];
 
+  const partidasPorAno = {};
+  DATA.partidas.forEach(p => {
+    const a = String(p.ano);
+    partidasPorAno[a] = (partidasPorAno[a] || 0) + 1;
+  });
+
   nav.innerHTML = anos.map(a => {
     const label = a === 'geral' ? 'Geral' : a;
+    const count = partidasPorAno[a];
+    const countTxt = count !== undefined ? ` <span class="sidebar-year-count">· ${count}j</span>` : '';
     const isActive = a === STATE.ranking.ano;
-    return `<button class="sidebar-year-btn ${isActive ? 'active' : ''}" data-ano="${a}">${label}</button>`;
+    return `<button class="sidebar-year-btn ${isActive ? 'active' : ''}" data-ano="${a}">${label}${countTxt}</button>`;
   }).join('');
 
   nav.addEventListener('click', e => {
     const yearBtn = e.target.closest('.sidebar-year-btn');
     if (yearBtn) {
       STATE.ranking.ano = yearBtn.dataset.ano;
+      STATE.ranking.mes = 'todos';
       syncRankingSidebar();
       renderRanking();
     }
@@ -234,27 +647,84 @@ function formDots(partidas, n = 5) {
 
 function renderRanking() {
   const ano     = STATE.ranking.ano;
+  const mes     = STATE.ranking.mes;
   const metrica = STATE.ranking.metrica;
   const limite  = STATE.ranking.limite;
   const anoCorrente = String(new Date().getFullYear());
   const usarMedalhas = (ano !== anoCorrente);
+  const usandoMes = (ano !== 'geral' && mes && mes !== 'todos');
+
+  updateMesFilter();
+
+  let totalPartidasEarly;
+  if (ano === 'geral') {
+    totalPartidasEarly = null;
+  } else if (usandoMes) {
+    totalPartidasEarly = DATA.partidas.filter(p => String(p.ano) === ano && p.data.slice(5, 7) === mes).length;
+  } else {
+    totalPartidasEarly = DATA.partidas.filter(p => String(p.ano) === ano).length;
+  }
 
   const linha = [], goleiros = [];
-  Object.values(DATA.jogadores).forEach(j => {
-    const s = ano === 'geral' ? j.geral : j.por_ano[ano];
-    if (!s || s.jogos === 0) return;
-    const entry = {
-      nome: j.nome, goleiro: j.goleiro,
-      jogos: s.jogos, vitorias: s.vitorias, empates: s.empates, derrotas: s.derrotas,
-      gols: s.gols, assists: s.assists, g_a: s.g_a,
-      g_a_jogo: s.jogos > 0 ? s.g_a / s.jogos : 0,
-      pontos: s.pontos, aproveitamento: s.aproveitamento,
-      partidas: j.partidas || [],
-    };
-    if (j.goleiro) goleiros.push(entry); else linha.push(entry);
-  });
 
-  const minJogos = (metrica === 'aproveitamento' || metrica === 'aproveitamento_pior') ? 15 : 0;
+  if (usandoMes) {
+    // Computar stats mensais on-the-fly a partir das partidas
+    const monthStats = computeStatsByFilter(ano, mes);
+    // Precisamos de stats por jogador — recomputar individualmente
+    const playerMap = {};
+    DATA.partidas
+      .filter(p => String(p.ano) === ano && p.data.slice(5, 7) === mes)
+      .forEach(p => {
+        Object.values(p.times).forEach(time => {
+          time.forEach(j => {
+            if (!playerMap[j.nome]) {
+              playerMap[j.nome] = { nome: j.nome, jogos: 0, vitorias: 0, empates: 0, derrotas: 0, pontos: 0, gols: 0, assists: 0 };
+            }
+            const s = playerMap[j.nome];
+            s.jogos++;
+            s.gols += j.gols || 0;
+            s.assists += j.assists || 0;
+            if (j.resultado === 'V') { s.pontos += 3; s.vitorias++; }
+            else if (j.resultado === 'E') { s.pontos += 1; s.empates++; }
+            else { s.derrotas++; }
+          });
+        });
+      });
+    Object.values(playerMap).forEach(s => {
+      const jData = DATA.jogadores[s.nome];
+      const isGoleiro = jData ? jData.goleiro : false;
+      const entry = {
+        nome: s.nome, goleiro: isGoleiro,
+        jogos: s.jogos, vitorias: s.vitorias, empates: s.empates, derrotas: s.derrotas,
+        gols: s.gols, assists: s.assists, g_a: s.gols + s.assists,
+        g_a_jogo: s.jogos > 0 ? (s.gols + s.assists) / s.jogos : 0,
+        pontos: s.pontos,
+        aproveitamento: s.jogos > 0 ? (s.pontos / (s.jogos * 3)) * 100 : 0,
+        presenca: totalPartidasEarly ? Math.round(s.jogos / totalPartidasEarly * 100) : null,
+        partidas: jData ? (jData.partidas || []) : [],
+      };
+      if (isGoleiro) goleiros.push(entry); else linha.push(entry);
+    });
+  } else {
+    Object.values(DATA.jogadores).forEach(j => {
+      const s = ano === 'geral' ? j.geral : j.por_ano[ano];
+      if (!s || s.jogos === 0) return;
+      const entry = {
+        nome: j.nome, goleiro: j.goleiro,
+        jogos: s.jogos, vitorias: s.vitorias, empates: s.empates, derrotas: s.derrotas,
+        gols: s.gols, assists: s.assists, g_a: s.g_a,
+        g_a_jogo: s.jogos > 0 ? s.g_a / s.jogos : 0,
+        pontos: s.pontos, aproveitamento: s.aproveitamento,
+        presenca: totalPartidasEarly ? Math.round(s.jogos / totalPartidasEarly * 100) : null,
+        partidas: j.partidas || [],
+      };
+      if (j.goleiro) goleiros.push(entry); else linha.push(entry);
+    });
+  }
+
+  const minJogos = (metrica === 'aproveitamento' || metrica === 'aproveitamento_pior')
+    ? (usandoMes ? 3 : 15)
+    : 0;
   const sortKey  = metrica === 'aproveitamento_pior' ? 'aproveitamento' : metrica;
   const ordem    = metrica === 'aproveitamento_pior' ? 'asc' : (STATE.ranking.ordem || 'desc');
   let sorted = linha.filter(p => p.jogos >= minJogos);
@@ -271,25 +741,37 @@ function renderRanking() {
     aproveitamento_pior: '📉 Pior Aproveitamento', jogos: '🏟️ Jogos',
     vitorias: '✅ Vitórias', empates: '🤝 Empates', derrotas: '❌ Derrotas',
   };
+  const mesTxt = usandoMes ? ` · ${MESES_PT[parseInt(mes, 10) - 1]}` : '';
   const anoTxt = ano === 'geral' ? 'Geral' : ano;
   document.getElementById('ranking-title').textContent =
-    `${metricaLabels[metrica] || 'Top'} — ${anoTxt}`;
-  document.getElementById('ranking-meta').textContent =
-    `${sorted.length} jogador${sorted.length === 1 ? '' : 'es'} de linha` +
-    (minJogos > 0 ? ` (≥ ${minJogos} jogos)` : '');
+    `${metricaLabels[metrica] || 'Top'} — ${anoTxt}${mesTxt}`;
+  const totalPartidas = totalPartidasEarly;
+
+  const metaTxt = `${sorted.length} jogador${sorted.length === 1 ? '' : 'es'} de linha` +
+    (minJogos > 0 ? ` (≥ ${minJogos} jogos)` : '') +
+    (totalPartidas !== null ? ` · ${totalPartidas} partidas na temporada` : '');
+  document.getElementById('ranking-meta').textContent = metaTxt;
+
+  // Mostrar/ocultar coluna de presença
+  const thPresenca = document.querySelector('.th-presenca');
+  if (thPresenca) thPresenca.style.display = totalPartidas !== null ? '' : 'none';
 
   const tbody = document.querySelector('#ranking-table tbody');
   tbody.innerHTML = view.length === 0
-    ? `<tr><td colspan="13" class="empty-state">Nenhum dado para este filtro.</td></tr>`
+    ? _emptyTd(14, "search", "Nenhum dado para este filtro", "Tente outro período ou métrica")
     : view.map((p, i) => {
         const rankTd = (usarMedalhas && i < 3)
           ? `<td class="num rank-medal">${['🥇','🥈','🥉'][i]}</td>`
           : `<td class="num rank-cell">${i + 1}</td>`;
         const hl = (col) => metrica === col ? 'metric-highlight' : '';
         const dots = formDots(p.partidas);
+        const presencaTd = totalPartidas !== null
+          ? `<td class="num">${Math.round(p.jogos / totalPartidas * 100)}%</td>`
+          : '<td class="num" style="display:none"></td>';
         return `<tr class="clickable" data-jogador="${escapeAttr(p.nome)}">
           ${rankTd}
           <td class="player-cell">${escapeHtml(p.nome)}</td>
+          <td class="num bold ${hl('pontos')}">${p.pontos}</td>
           <td class="num ${hl('jogos')}">${p.jogos}</td>
           <td class="num">${p.vitorias}</td>
           <td class="num">${p.empates}</td>
@@ -298,8 +780,10 @@ function renderRanking() {
           <td class="num ${hl('assists')}">${p.assists}</td>
           <td class="num ${hl('g_a')}">${p.g_a}</td>
           <td class="num ${hl('g_a_jogo')}">${p.g_a_jogo.toFixed(2).replace('.', ',')}</td>
-          <td class="num bold ${hl('pontos')}">${p.pontos}</td>
           <td class="num ${hl('aproveitamento') || hl('aproveitamento_pior')}">${p.aproveitamento.toFixed(1).replace('.', ',')}%</td>
+          ${totalPartidas !== null
+            ? `<td class="num ${metrica === 'presenca' ? 'metric-highlight' : ''}">${p.presenca}%</td>`
+            : '<td class="num" style="display:none"></td>'}
           <td class="form-dots-cell"><div class="form-dots">${dots}</div></td>
         </tr>`;
       }).join('');
@@ -313,7 +797,7 @@ function renderRanking() {
   const golSorted = goleiros.slice().sort((a, b) => b.pontos - a.pontos);
   const tbg = document.querySelector('#goleiros-table tbody');
   tbg.innerHTML = golSorted.length === 0
-    ? `<tr><td colspan="9" class="empty-state">Nenhum goleiro neste período.</td></tr>`
+    ? _emptyTd(9, "search", "Nenhum goleiro neste período", "Tente selecionar outro ano")
     : golSorted.map((g, i) => `
         <tr class="clickable" data-jogador="${escapeAttr(g.nome)}">
           <td class="num ${(usarMedalhas && i < 3) ? 'rank-medal' : 'rank-cell'}">${(usarMedalhas && i < 3) ? ['🥇','🥈','🥉'][i] : i+1}</td>
@@ -335,6 +819,8 @@ function renderRanking() {
   updateSortHeaders();
   // Atualiza status da barra mobile
   if (isMobile()) updateMobileBar();
+  // Atualiza URL hash
+  pushHash();
 }
 
 function updateSortHeaders() {
@@ -393,23 +879,41 @@ function closeMobileSheets() {
   document.getElementById('mobile-overlay').classList.remove('open');
   document.getElementById('sheet-temporada').classList.remove('open');
   document.getElementById('sheet-filtros').classList.remove('open');
+  const sp = document.getElementById('sheet-partidas-temporada');
+  if (sp) sp.classList.remove('open');
 }
 
 function openMobileSheet(id) {
-  // Preenche conteúdo antes de abrir
-  if (id === 'sheet-filtros')    renderSheetFiltros();
-  if (id === 'sheet-temporada')  renderSheetTemporada();
+  if (id === 'sheet-filtros')              renderSheetFiltros();
+  if (id === 'sheet-temporada')            renderSheetTemporada();
+  if (id === 'sheet-partidas-temporada')   renderSheetPartidasTemporada();
   document.getElementById('mobile-overlay').classList.add('open');
   document.getElementById(id).classList.add('open');
 }
 
 function updateMobileBar() {
   const el = document.getElementById('mobile-bar-status');
+  const btnFilt = document.getElementById('mb-filtros');
   if (!el) return;
-  const anoLabel    = STATE.ranking.ano === 'geral' ? 'Geral' : STATE.ranking.ano;
-  const limiteLabel = STATE.ranking.limite === 0 ? 'Todos' : `Top ${STATE.ranking.limite}`;
-  const metLabel    = METRICA_LABELS[STATE.ranking.metrica] || STATE.ranking.metrica;
-  el.textContent = `${metLabel} · ${limiteLabel} · ${anoLabel}`;
+
+  const activeTab = document.querySelector('.tab-panel.active');
+  const isPartidas = activeTab && activeTab.id === 'tab-partidas';
+
+  if (isPartidas) {
+    // Contexto: Partidas
+    const anoLabel = STATE.partidas.ano === 'todos' ? 'Todos os anos' : STATE.partidas.ano;
+    const mesLabel = STATE.partidas.mes === 'todos' ? '' : ` · ${MESES_PT[parseInt(STATE.partidas.mes, 10) - 1]}`;
+    el.textContent = `${anoLabel}${mesLabel}`;
+    // Esconder botão Filtros na aba Partidas (não tem filtros de métrica)
+    if (btnFilt) btnFilt.style.display = 'none';
+  } else {
+    // Contexto: Rankings
+    const anoLabel    = STATE.ranking.ano === 'geral' ? 'Geral' : STATE.ranking.ano;
+    const limiteLabel = STATE.ranking.limite === 0 ? 'Todos' : `Top ${STATE.ranking.limite}`;
+    const metLabel    = METRICA_LABELS[STATE.ranking.metrica] || STATE.ranking.metrica;
+    el.textContent = `${metLabel} · ${limiteLabel} · ${anoLabel}`;
+    if (btnFilt) btnFilt.style.display = '';
+  }
 }
 
 function renderSheetTemporada() {
@@ -425,6 +929,7 @@ function renderSheetTemporada() {
   body.querySelectorAll('.sheet-year-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       STATE.ranking.ano   = btn.dataset.ano;
+      STATE.ranking.mes   = 'todos';
       STATE.ranking.ordem = 'desc';
       syncRankingSidebar();
       renderRanking();
@@ -540,6 +1045,82 @@ function renderSheetFiltros() {
 }
 
 
+// ── Sheet: Partidas — Temporada (ano + mês) ──
+function renderSheetPartidasTemporada() {
+  const body = document.getElementById('sheet-partidas-temporada-body');
+  if (!body) return;
+
+  const anos = (DATA.meta && DATA.meta.anos_disponiveis ? [...DATA.meta.anos_disponiveis].map(String).sort().reverse() : []);
+
+  // Meses disponíveis para o ano selecionado
+  const mesesPorAno = {};
+  DATA.partidas.forEach(p => {
+    const a = String(p.ano);
+    const m = p.data.slice(5, 7);
+    if (!mesesPorAno[a]) mesesPorAno[a] = new Set();
+    mesesPorAno[a].add(m);
+  });
+
+  const anoAtivo = STATE.partidas.ano;
+  const MESES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+  // Meses para o ano selecionado
+  let mesesHtml = '';
+  if (anoAtivo !== 'todos' && mesesPorAno[anoAtivo]) {
+    const meses = [...mesesPorAno[anoAtivo]].sort();
+    mesesHtml = `
+      <div class="sheet-section">
+        <div class="sheet-section-label">Mês</div>
+        <div class="sheet-pill-row">
+          <button class="sheet-pill${STATE.partidas.mes === 'todos' ? ' active' : ''}" data-mes="todos">Todos</button>
+          ${meses.map(m => `
+            <button class="sheet-pill${STATE.partidas.mes === m ? ' active' : ''}" data-mes="${m}">${MESES_ABREV[parseInt(m, 10) - 1]}</button>
+          `).join('')}
+        </div>
+      </div>`;
+  }
+
+  body.innerHTML = `
+    <div class="sheet-section">
+      <div class="sheet-section-label">Ano</div>
+      <div class="sheet-year-list">
+        <button class="sheet-year-btn${anoAtivo === 'todos' ? ' active' : ''}" data-ano="todos">
+          🌐 Todos os anos
+        </button>
+        ${anos.map(a => `
+          <button class="sheet-year-btn${anoAtivo === a ? ' active' : ''}" data-ano="${a}">
+            📅 ${a}
+          </button>
+        `).join('')}
+      </div>
+    </div>
+    ${mesesHtml}`;
+
+  // Event: Ano
+  body.querySelectorAll('.sheet-year-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      STATE.partidas.ano = btn.dataset.ano;
+      STATE.partidas.mes = 'todos';
+      syncPartidasSidebar();
+      renderPartidas();
+      updateMobileBar();
+      // Re-render o sheet para mostrar meses do novo ano
+      renderSheetPartidasTemporada();
+    });
+  });
+
+  // Event: Mês
+  body.querySelectorAll('.sheet-pill[data-mes]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      STATE.partidas.mes = btn.dataset.mes;
+      syncPartidasSidebar();
+      renderPartidas();
+      closeMobileSheets();
+      updateMobileBar();
+    });
+  });
+}
+
 function setupMobileTableScroll() {
   // No mobile, o browser confunde scroll horizontal da tabela com scroll vertical da página.
   // Usamos delta incremental entre eventos consecutivos para evitar o problema de trava.
@@ -580,31 +1161,36 @@ function setupMobileTableScroll() {
 }
 
 function setupMobileSheets() {
-  // Elementos mobile podem não existir em versões antigas do index.html
   const bar     = document.getElementById('mobile-bar');
   const btnTemp = document.getElementById('mb-temporada');
   const btnFilt = document.getElementById('mb-filtros');
   const overlay = document.getElementById('mobile-overlay');
-  if (!bar || !btnTemp || !btnFilt || !overlay) return; // silencioso — sem crash
+  if (!bar || !btnTemp || !btnFilt || !overlay) return;
 
-  // Mostrar/ocultar barra conforme aba ativa
+  // Mostrar barra nas abas Rankings E Partidas
   function syncBarVisibility() {
     const activeTab  = document.querySelector('.tab-panel.active');
-    const isRankings = activeTab && activeTab.id === 'tab-rankings';
-    bar.classList.toggle('hidden', !isRankings);
+    const showBar = activeTab && (activeTab.id === 'tab-rankings' || activeTab.id === 'tab-partidas');
+    bar.classList.toggle('hidden', !showBar);
+    updateMobileBar();
   }
 
-  // Observar mudança de aba
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => setTimeout(syncBarVisibility, 50));
   });
   syncBarVisibility();
 
-  // Botões da barra
-  btnTemp.addEventListener('click', () => openMobileSheet('sheet-temporada'));
+  // Botões da barra — decidem qual sheet abrir conforme aba ativa
+  btnTemp.addEventListener('click', () => {
+    const activeTab = document.querySelector('.tab-panel.active');
+    if (activeTab && activeTab.id === 'tab-partidas') {
+      openMobileSheet('sheet-partidas-temporada');
+    } else {
+      openMobileSheet('sheet-temporada');
+    }
+  });
   btnFilt.addEventListener('click', () => openMobileSheet('sheet-filtros'));
 
-  // Fechar ao clicar no overlay
   overlay.addEventListener('click', closeMobileSheets);
 
   updateMobileBar();
@@ -629,7 +1215,7 @@ function renderJogadores() {
 
   const tbody = document.querySelector('#jogadores-table tbody');
   tbody.innerHTML = lista.length === 0
-    ? `<tr><td colspan="5" class="empty-state">Nenhum jogador encontrado.</td></tr>`
+    ? _emptyTd(5, "search", "Nenhum jogador encontrado", "Tente outro termo de busca")
     : lista.map(j => `
         <tr class="clickable ${STATE.jogadores.selecionado === j.nome ? 'selected' : ''}"
             data-jogador="${escapeAttr(j.nome)}">
@@ -652,6 +1238,7 @@ function abrirJogador(nome) {
   renderJogadores();
   renderDetalheJogador(nome);
   document.getElementById('jogador-detalhe').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  pushHash();
 }
 
 function voltarParaLista() {
@@ -659,14 +1246,15 @@ function voltarParaLista() {
   document.getElementById('jogadores-layout').classList.remove('player-selected');
   renderJogadores();
   document.getElementById('jogador-detalhe').innerHTML =
-    '<p class="placeholder">Selecione um jogador para ver o histórico completo.</p>';
+    _emptyBlock("person", "Selecione um jogador", "Clique em um nome na lista para ver o histórico completo");
+  pushHash();
 }
 
 function renderDetalheJogador(nome, anoFiltro) {
   anoFiltro = anoFiltro || 'geral';
   const j = DATA.jogadores[nome];
   const wrap = document.getElementById('jogador-detalhe');
-  if (!j) { wrap.innerHTML = `<p class="placeholder">Jogador não encontrado.</p>`; return; }
+  if (!j) { wrap.innerHTML = _emptyBlock("search", "Jogador não encontrado", "Tente pesquisar por outro nome"); return; }
 
   const role = j.goleiro ? 'Goleiro' : 'Jogador de linha';
 
@@ -812,6 +1400,7 @@ function renderDetalheJogador(nome, anoFiltro) {
     if (!btn) return;
     renderDetalheJogador(nome, btn.dataset.ano);
     wrap.scrollTop = 0;
+    pushHash();
   });
 
   // Toggle grafico de aproveitamento
@@ -1089,9 +1678,8 @@ function buildCorridaChartSVG(topN, ano) {
   const xAxisLine = `<line x1="${PAD.left}" y1="${yAxis}" x2="${PAD.left + iW}" y2="${yAxis}"
     stroke="#ccc" stroke-width="1"/>`;
 
-  // Labels eixo X — "5/mai", "19/mai" — intervalo simétrico, sempre inclui último
+  // Labels eixo X
   const TARGET_LABELS = 7;
-  // Escolher step que minimize |count - TARGET| e, de preferência, faça (M-1) % step === 0
   let bestStep = 1, bestScore = Infinity;
   for (let s = 1; s <= M; s++) {
     const count = Math.floor((M - 1) / s) + 1;
@@ -1124,7 +1712,7 @@ function buildCorridaChartSVG(topN, ano) {
   const labelByIdx = {};
   labelData.forEach(l => { labelByIdx[l.idx] = l; });
 
-  // Grupos por jogador (linha + ponto final + label) — hover em grupo
+  // Grupos por jogador
   const xLbl = (PAD.left + iW + 7).toFixed(1);
   const playerGroups = playerLines.map(pl => {
     const pts = pl.points.map((v, i) =>
@@ -1290,7 +1878,7 @@ function renderPartidas() {
   }
 
   if (lista.length === 0) {
-    wrap.innerHTML = '<p class="empty-state">Nenhuma partida encontrada.</p>';
+    wrap.innerHTML = _emptyBlock("calendar", "Nenhuma partida encontrada", "Tente outro período ou termo de busca");
     return;
   }
 
@@ -1323,6 +1911,8 @@ function renderPartidas() {
     const li = e.target.closest('li[data-jogador]');
     if (li) abrirJogador(li.dataset.jogador);
   };
+
+  pushHash();
 }
 
 function renderPartidaCard(p) {
@@ -1333,15 +1923,15 @@ function renderPartidaCard(p) {
   const placarHtml = (timesOrd.includes('Preto') || timesOrd.includes('Branco'))
     ? `<div class="placar-v2">
         <div class="placar-team">
-          <span class="badge-circle preto">⚫</span>
+          <span class="badge-circle preto"></span>
           <span class="placar-nome">Preto</span>
-          <span class="placar-score">${p.placar_p ?? '—'}</span>
+          <span class="placar-score">${p.placar_p ?? '\u2014'}</span>
         </div>
-        <span class="placar-sep">×</span>
+        <span class="placar-sep">\u00D7</span>
         <div class="placar-team placar-team-right">
-          <span class="placar-score">${p.placar_b ?? '—'}</span>
+          <span class="placar-score">${p.placar_b ?? '\u2014'}</span>
           <span class="placar-nome">Branco</span>
-          <span class="badge-circle branco">⚪</span>
+          <span class="badge-circle branco"></span>
         </div>
       </div>`
     : '';
@@ -1353,15 +1943,15 @@ function renderPartidaCard(p) {
         .sort((a, b) => (b.gols + b.assists) - (a.gols + a.assists) || a.nome.localeCompare(b.nome, 'pt-BR'))
         .map(j => {
           const tags = [];
-          if (j.gols)    tags.push(`<span class="stat-icon">⚽${j.gols > 1 ? ' '+j.gols : ''}</span>`);
-          if (j.assists) tags.push(`<span class="stat-icon">👟${j.assists > 1 ? ' '+j.assists : ''}</span>`);
+          if (j.gols)    tags.push(`<span class="stat-icon">\u26BD${j.gols > 1 ? ' '+j.gols : ''}</span>`);
+          if (j.assists) tags.push(`<span class="stat-icon">\uD83D\uDC5F${j.assists > 1 ? ' '+j.assists : ''}</span>`);
           const tagStr = tags.length ? `<span class="stat-tags">${tags.join('')}</span>` : '';
           return `<li data-jogador="${escapeAttr(j.nome)}" class="clickable">
                     <span class="jog-nome">${escapeHtml(j.nome.replace(' (Goleiro)', ''))}</span>${tagStr}
                   </li>`;
         }).join('');
       return `<div class="time-col">
-        <h4 class="time-col-header">${t === 'Preto' ? '⚫' : '⚪'} ${escapeHtml(t)}</h4>
+        <h4 class="time-col-header">${t === 'Preto' ? '\u26AB' : '\u26AA'} ${escapeHtml(t)}</h4>
         <ul>${jogadores}</ul>
       </div>`;
     }).join('')
@@ -1374,25 +1964,279 @@ function renderPartidaCard(p) {
   </article>`;
 }
 
-// ══════════════════════════════════════
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 //  Sobre
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 // ══════════════════════════════════════
+//  Recordes e curiosidades
+// ══════════════════════════════════════
+// ══════════════════════════════════════
+//  Head-to-Head
+// ══════════════════════════════════════
+function computeH2H(nome1, nome2) {
+  const j1 = DATA.jogadores[nome1];
+  const j2 = DATA.jogadores[nome2];
+  const map1 = new Map(j1.partidas.map(p => [p.data, p]));
+  const map2 = new Map(j2.partidas.map(p => [p.data, p]));
+  const comuns = [...map1.keys()].filter(d => map2.has(d));
+
+  const r = { total: comuns.length, mesmo_time: 0, opostos: 0,
+              j1: {v:0,e:0,d:0,pts:0,gols:0,assists:0},
+              j2: {v:0,e:0,d:0,pts:0,gols:0,assists:0} };
+
+  for (const dt of comuns) {
+    const p1 = map1.get(dt), p2 = map2.get(dt);
+    r.j1.gols    += p1.gols;    r.j2.gols    += p2.gols;
+    r.j1.assists += p1.assists; r.j2.assists += p2.assists;
+    if (p1.time === p2.time) {
+      r.mesmo_time++;
+    } else {
+      r.opostos++;
+      r.j1.v += p1.resultado==='V'?1:0; r.j1.e += p1.resultado==='E'?1:0;
+      r.j1.d += p1.resultado==='D'?1:0; r.j1.pts += p1.pontos;
+      r.j2.v += p2.resultado==='V'?1:0; r.j2.e += p2.resultado==='E'?1:0;
+      r.j2.d += p2.resultado==='D'?1:0; r.j2.pts += p2.pontos;
+    }
+  }
+  return r;
+}
+
+function renderH2H(nome1, nome2) {
+  const el = document.getElementById('h2h-result');
+  if (!el) return;
+  if (!nome1 || !nome2 || nome1 === nome2) { el.innerHTML = ''; return; }
+
+  const g1  = DATA.jogadores[nome1].geral;
+  const g2  = DATA.jogadores[nome2].geral;
+  const h2h = computeH2H(nome1, nome2);
+
+  function pct(v1, v2) {
+    const t = v1 + v2;
+    if (t === 0) return [50, 50];
+    return [Math.round(v1 / t * 100), Math.round(v2 / t * 100)];
+  }
+
+  function brow(lbl, v1, v2, sfx, higher) {
+    if (higher === undefined) higher = true;
+    const [p1, p2] = pct(+v1, +v2);
+    const j1w = higher ? +v1 > +v2 : +v1 < +v2;
+    const j2w = higher ? +v2 > +v1 : +v2 < +v1;
+    const c1 = j1w ? ' win' : ''; const c2 = j2w ? ' win' : '';
+    const d1 = sfx ? v1 + sfx : v1; const d2 = sfx ? v2 + sfx : v2;
+    return `<div class="h2h-brow">
+      <span class="h2h-bval left${c1}">${d1}</span>
+      <div class="h2h-bhalf left"><div class="h2h-bfill${c1}" style="width:${p1}%"></div></div>
+      <span class="h2h-blbl">${lbl}</span>
+      <div class="h2h-bhalf right"><div class="h2h-bfill${c2}" style="width:${p2}%"></div></div>
+      <span class="h2h-bval right${c2}">${d2}</span>
+    </div>`;
+  }
+
+  const noJogos = h2h.total === 0;
+
+  el.innerHTML = `
+    <div class="h2h-panel">
+      <div class="h2h-header">
+        <span class="h2h-pname left">${nome1}</span>
+        <span class="h2h-vsbadge">⚔️ vs</span>
+        <span class="h2h-pname right">${nome2}</span>
+      </div>
+      <p class="h2h-sec-lbl">Estatísticas gerais</p>
+      ${brow('jogos',    g1.jogos,          g2.jogos)}
+      ${brow('pontos',   g1.pontos,         g2.pontos)}
+      ${brow('aprov. %', g1.aproveitamento, g2.aproveitamento, '%')}
+      ${brow('gols',     g1.gols,           g2.gols)}
+      ${brow('assists',  g1.assists,        g2.assists)}
+      ${brow('g+a',      g1.g_a,            g2.g_a)}
+      <hr class="h2h-divider">
+      ${noJogos
+        ? '<p class="h2h-empty">Esses jogadores nunca jogaram juntos.</p>'
+        : `<div class="h2h-together">
+            <span>Jogaram em <strong>${h2h.total}</strong> partidas juntos</span>
+            <span>Mesmo time: <strong>${h2h.mesmo_time}</strong></span>
+            <span>Frente a frente: <strong>${h2h.opostos}</strong></span>
+           </div>
+           ${h2h.opostos > 0 ? `
+           <p class="h2h-sec-lbl" style="margin-top:14px">Frente a frente — ${h2h.opostos} partidas</p>
+           ${brow('vitórias', h2h.j1.v,   h2h.j2.v)}
+           ${brow('empates',  h2h.j1.e,   h2h.j2.e)}
+           ${brow('pontos',   h2h.j1.pts, h2h.j2.pts)}
+           ${brow('gols',     h2h.j1.gols,h2h.j2.gols)}
+           ` : ''}`}
+    </div>`;
+}
+
+function renderRecordes() {
+  const wrap = document.getElementById('recordes-content');
+  if (!wrap || !DATA) return;
+
+  const partidas   = DATA.partidas;
+  const totalP     = DATA.meta.total_partidas;
+  const linhaJogs  = Object.values(DATA.jogadores).filter(j => !j.goleiro);
+  const linhaMin   = linhaJogs.filter(j => j.geral.jogos >= 5);
+
+  // ── Recordes de partida ──────────────────────────────────────────
+  const maiorGoleada = partidas.reduce((mx, p) =>
+    Math.abs(p.placar_p - p.placar_b) > Math.abs(mx.placar_p - mx.placar_b) ? p : mx);
+  const maisGolsP = partidas.reduce((mx, p) =>
+    (p.placar_p + p.placar_b) > (mx.placar_p + mx.placar_b) ? p : mx);
+
+  // ── Recordes de jogador ──────────────────────────────────────────
+  const artilheiro = linhaMin.reduce((mx, j) => j.geral.gols > mx.geral.gols ? j : mx);
+  const maisJogos  = linhaJogs.reduce((mx, j) => j.geral.jogos > mx.geral.jogos ? j : mx);
+
+  // Mais G+A numa partida
+  let maisGA = { nome: '', ga: 0, gols: 0, assists: 0, data: '' };
+  for (const j of linhaMin) {
+    for (const p of j.partidas) {
+      const ga = p.gols + p.assists;
+      if (ga > maisGA.ga) maisGA = { nome: j.nome, ga, gols: p.gols, assists: p.assists, data: p.data };
+    }
+  }
+
+  // Mais gols numa partida (jogador)
+  let maisGolsJ = { nome: '', gols: 0, data: '' };
+  for (const j of linhaMin) {
+    for (const p of j.partidas) {
+      if (p.gols > maisGolsJ.gols) maisGolsJ = { nome: j.nome, gols: p.gols, data: p.data };
+    }
+  }
+
+  // Sequência de resultados
+  function maxStreak(jog, res) {
+    const pts = [...jog.partidas].sort((a, b) => a.data.localeCompare(b.data));
+    let mx = 0, cur = 0;
+    for (const p of pts) { res.includes(p.resultado) ? (cur++, mx = Math.max(mx, cur)) : (cur = 0); }
+    return mx;
+  }
+  const linhaStreak = linhaJogs.filter(j => j.geral.jogos >= 30);
+  const svMap   = linhaStreak.map(j => ({ nome: j.nome, s: maxStreak(j, ['V']) })).sort((a,b) => b.s-a.s);
+  const invMap  = linhaStreak.map(j => ({ nome: j.nome, s: maxStreak(j, ['V','E']) })).sort((a,b) => b.s-a.s);
+
+  // Mais regular (% presença)
+  const regular = linhaMin
+    .filter(j => j.geral.jogos >= 20)
+    .map(j => ({ nome: j.nome, jogos: j.geral.jogos, pct: +(j.geral.jogos / totalP * 100).toFixed(1) }))
+    .sort((a, b) => b.pct - a.pct)[0];
+
+  // ── Helpers ──────────────────────────────────────────────────────
+  function fmt(d) { const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
+  function tied(arr) {
+    const best = arr[0].s;
+    const names = arr.filter(x => x.s === best).map(x => x.nome);
+    return { names: names.slice(0,2).join(' e '), s: best, extra: names.length > 2 ? ` +${names.length-2}` : '' };
+  }
+
+  function recCard(emoji, titulo, holder, valor, ctx, clickNome) {
+    const cls = clickNome ? ' rec-card--link" data-jogador="' + clickNome + '"' : '"';
+    return `<div class="rec-card${cls}>
+      <div class="rec-icon">${emoji}</div>
+      <div class="rec-body">
+        <div class="rec-titulo">${titulo}</div>
+        <div class="rec-holder">${holder}</div>
+        <div class="rec-valor">${valor}</div>
+        ${ctx ? `<div class="rec-ctx">${ctx}</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  const sv  = tied(svMap);
+  const inv = tied(invMap);
+
+  wrap.innerHTML = `
+    <div class="rec-wrap">
+      <h3 class="rec-section-title">🏟️ Recordes de Partida</h3>
+      <div class="rec-grid">
+        ${recCard('🔥','Mais Gols numa Partida',
+          `Preto ${maisGolsP.placar_p} × ${maisGolsP.placar_b} Branco`,
+          `${maisGolsP.placar_p + maisGolsP.placar_b} gols no total`,
+          fmt(maisGolsP.data))}
+        ${recCard('💥','Maior Goleada',
+          `Preto ${maiorGoleada.placar_p} × ${maiorGoleada.placar_b} Branco`,
+          `${Math.abs(maiorGoleada.placar_p - maiorGoleada.placar_b)} gols de diferença`,
+          fmt(maiorGoleada.data))}
+      </div>
+
+      <h3 class="rec-section-title">👤 Recordes de Jogador</h3>
+      <div class="rec-grid">
+        ${recCard('⚽','Artilheiro Histórico',
+          artilheiro.nome, `${artilheiro.geral.gols} gols`,
+          `em ${artilheiro.geral.jogos} partidas`, artilheiro.nome)}
+        ${recCard('⚡','Mais Gols numa Partida',
+          maisGolsJ.nome, `${maisGolsJ.gols} gols`,
+          fmt(maisGolsJ.data), maisGolsJ.nome)}
+        ${recCard('🎯','Mais G+A numa Partida',
+          maisGA.nome, `${maisGA.gols}G + ${maisGA.assists}A`,
+          fmt(maisGA.data), maisGA.nome)}
+        ${recCard('🏟️','Mais Jogos',
+          maisJogos.nome, `${maisJogos.geral.jogos} partidas`,
+          `desde ${DATA.meta.primeira_partida.slice(0,4)}`, maisJogos.nome)}
+        ${regular ? recCard('📅','Mais Regular',
+          regular.nome, `${regular.pct}% de presença`,
+          `${regular.jogos} de ${totalP} partidas`, regular.nome) : ''}
+        ${recCard('🏆','Maior Sequência de Vitórias',
+          sv.names + sv.extra, `${sv.s} vitórias seguidas`, '')}
+        ${recCard('🛡️','Maior Sequência Invicto',
+          inv.names + inv.extra, `${inv.s} jogos sem derrota`, '')}
+      </div>
+    </div>`;
+
+
+  // ── H2H section ──────────────────────────────────────────────────
+  const h2hJogs = linhaJogs
+    .filter(j => j.geral.jogos >= 5)
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  const h2hOpts = h2hJogs.map(j =>
+    `<option value="${j.nome}">${j.nome} (${j.geral.jogos}j)</option>`).join('');
+
+  wrap.innerHTML += `
+    <div class="h2h-section">
+      <h3 class="rec-section-title h2h-title">⚔️ Comparação Head-to-Head</h3>
+      <div class="h2h-selectors">
+        <select id="h2h-j1" class="h2h-select">
+          <option value="">Escolha o jogador 1…</option>${h2hOpts}
+        </select>
+        <div class="h2h-vs">VS</div>
+        <select id="h2h-j2" class="h2h-select">
+          <option value="">Escolha o jogador 2…</option>${h2hOpts}
+        </select>
+      </div>
+      <div id="h2h-result"></div>
+    </div>`;
+
+  const sel1 = document.getElementById('h2h-j1');
+  const sel2 = document.getElementById('h2h-j2');
+  sel1.addEventListener('change', () => renderH2H(sel1.value, sel2.value));
+  sel2.addEventListener('change', () => renderH2H(sel1.value, sel2.value));
+
+  // Clique nos cards de jogador → navega para o perfil
+  wrap.querySelectorAll('.rec-card--link').forEach(card => {
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', () => {
+      const nome = card.dataset.jogador;
+      document.querySelector('[data-tab="jogadores"]').click();
+      setTimeout(() => abrirJogador(nome), 60);
+    });
+  });
+}
+
+
 function renderSobre() {
   const m = DATA.meta;
   document.getElementById('sobre-meta').innerHTML = `
-    Última partida: <strong>${formatDataBR(m.ultima_partida)}</strong>.<br>
+    \u00DAltima partida: <strong>${formatDataBR(m.ultima_partida)}</strong>.<br>
     Total de partidas: <strong>${m.total_partidas}</strong>.<br>
     Total de jogadores: <strong>${m.total_jogadores}</strong>.<br>
-    Anos disponíveis: <strong>${m.anos_disponiveis.join(', ')}</strong>.<br>
-    Página gerada em <strong>${formatDataBR(m.atualizado_em)}</strong>.
+    Anos dispon\u00EDveis: <strong>${m.anos_disponiveis.join(', ')}</strong>.<br>
+    P\u00E1gina gerada em <strong>${formatDataBR(m.atualizado_em)}</strong>.
   `;
 }
 
-// ══════════════════════════════════════
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 //  Util
-// ══════════════════════════════════════
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 function formatDataBR(iso) {
-  if (!iso) return '—';
+  if (!iso) return '\u2014';
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
 }

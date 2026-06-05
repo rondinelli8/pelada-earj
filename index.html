@@ -4,13 +4,74 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pelada EARJ — Estatísticas</title>
-  <link rel="stylesheet" href="style_v2.css?v=12" />
+
+  <!-- Favicon (emoji ⚽ como SVG — zero arquivo extra) -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>" />
+
+  <!-- Open Graph / WhatsApp preview -->
+  <meta property="og:title"       content="Pelada EARJ — Estatísticas" />
+  <meta property="og:description" content="Histórico completo das peladas de segunda-feira na Escola Americana do Rio de Janeiro. Rankings, partidas e estatísticas desde 2022." />
+  <meta property="og:type"        content="website" />
+  <meta property="og:locale"      content="pt_BR" />
+  <!-- og:image: substitua pela URL pública da imagem após publicar o site -->
+  <!-- <meta property="og:image" content="https://seu-dominio/og-image.png" /> -->
+  <meta name="description" content="Histórico completo das peladas de segunda-feira na Escola Americana do Rio de Janeiro. Rankings, partidas e estatísticas desde 2022." />
+
+  <!-- Dark mode: aplica o tema ANTES do CSS pintar a tela (evita flash) -->
+  <script>
+    (function () {
+      var stored = localStorage.getItem('pelada-theme');
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (stored === 'dark' || (!stored && prefersDark)) {
+        document.documentElement.classList.add('dark');
+      } else if (stored === 'light') {
+        document.documentElement.classList.add('light');
+      }
+    })();
+  </script>
+
+  <link rel="stylesheet" href="style_v2.css?v=15" />
 </head>
 <body>
+  <!-- ════════════ LOADING OVERLAY ════════════ -->
+  <div id="loading-overlay" aria-label="Carregando" role="status">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">Carregando estatísticas…</p>
+  </div>
+
   <header class="site-header">
     <div class="container">
-      <h1>⚽ Pelada EARJ</h1>
-      <p class="subtitle">Estatísticas históricas — segundas-feiras na Escola Americana do Rio de Janeiro</p>
+      <div class="site-crest-wrap">
+        <svg class="site-crest" viewBox="0 0 52 62" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Escudo Pelada EARJ" role="img">
+        <!-- Metade esquerda: Preto -->
+        <path d="M26 2 L26 60 C26 60 2 49 2 35 L2 11 Z" fill="var(--preto-bg)"/>
+        <!-- Metade direita: Branco -->
+        <path d="M26 2 L50 11 L50 35 C50 49 26 60 26 60 Z" fill="var(--branco-bg)"/>
+        <!-- Borda do escudo -->
+        <path d="M26 2 L50 11 L50 35 C50 49 26 60 26 60 C26 60 2 49 2 35 L2 11 Z"
+              fill="none" stroke="var(--border-strong)" stroke-width="2" stroke-linejoin="round"/>
+        <!-- Linha central divisória -->
+        <line x1="26" y1="2" x2="26" y2="60" stroke="var(--border-strong)" stroke-width="1"/>
+        <!-- Bola de futebol: círculo -->
+        <circle cx="26" cy="27" r="10" stroke="var(--text-muted)" stroke-width="1.5"/>
+        <!-- Pêntagono superior (patch clássico do Telstar) -->
+        <path d="M26 18 L29.1 20.3 L27.9 23.8 L24.1 23.8 L22.9 20.3 Z"
+              fill="var(--text-muted)" opacity="0.55"/>
+        <!-- Patch inferior (sutil) -->
+        <path d="M26 36 L22.9 33.7 L24.1 30.2 L27.9 30.2 L29.1 33.7 Z"
+              fill="var(--text-muted)" opacity="0.28"/>
+        <!-- Texto EARJ -->
+        <text x="26" y="53" text-anchor="middle"
+              font-size="5" font-weight="800" letter-spacing="1.5"
+              font-family="-apple-system, BlinkMacSystemFont, sans-serif"
+              fill="var(--text-muted)">EARJ</text>
+      </svg>
+      </div>
+      <div class="site-header-text">
+        <h1>Pelada EARJ</h1>
+        <p class="subtitle">Estatísticas históricas — segundas-feiras na Escola Americana do Rio de Janeiro</p>
+      </div>
+      <button class="dark-toggle" id="dark-toggle" title="Alternar modo escuro" aria-label="Alternar modo escuro">🌙</button>
     </div>
   </header>
 
@@ -19,9 +80,29 @@
       <button class="tab-btn active" data-tab="rankings">Rankings</button>
       <button class="tab-btn" data-tab="jogadores">Jogadores</button>
       <button class="tab-btn" data-tab="partidas">Partidas</button>
+      <button class="tab-btn" data-tab="recordes">Recordes</button>
       <button class="tab-btn" data-tab="sobre">Sobre</button>
     </div>
   </nav>
+
+  <!-- ════════════ DESTAQUES DA TEMPORADA ════════════ -->
+  <section class="destaques-section" id="destaques-section" style="display:none">
+    <div class="container">
+
+      <!-- Cabeçalho com seletor de temporada -->
+      <div class="destaques-header">
+        <h2 class="destaques-titulo">⚽ Destaques <span id="destaques-ano-label">2025</span></h2>
+        <div class="destaques-ano-pills" id="destaques-ano-pills"></div>
+      </div>
+
+      <!-- Cards de estatísticas gerais -->
+      <div class="destaques-grid" id="destaques-grid"></div>
+
+      <!-- Destaques individuais -->
+      <div class="destaques-individuais" id="destaques-individuais"></div>
+
+    </div>
+  </section>
 
   <main class="container">
 
@@ -42,6 +123,13 @@
 
         <!-- Conteúdo principal -->
         <div class="tab-main-content">
+
+          <!-- Filtro por mês -->
+          <div class="mes-filter-bar" id="mes-filter-bar" style="display:none">
+            <span class="mes-filter-label">📅 Mês:</span>
+            <div class="mes-filter-pills" id="mes-filter-pills"></div>
+          </div>
+
           <div class="filters">
             <div class="filter-group">
               <label>Filtro</label>
@@ -98,6 +186,7 @@
                     <tr>
                       <th class="num">#</th>
                       <th>Jogador</th>
+                      <th class="num sortable" data-sort="pontos">🏆 Pts</th>
                       <th class="num sortable" data-sort="jogos">🏟️ J</th>
                       <th class="num sortable" data-sort="vitorias">✅ V</th>
                       <th class="num sortable" data-sort="empates">🤝 E</th>
@@ -106,9 +195,9 @@
                       <th class="num sortable" data-sort="assists">👟 A</th>
                       <th class="num sortable" data-sort="g_a">🎯 G+A</th>
                       <th class="num sortable" data-sort="g_a_jogo">🎯 /J</th>
-                      <th class="num sortable" data-sort="pontos">🏆 Pts</th>
                       <th class="num sortable" data-sort="aproveitamento">📈 %</th>
-                      <th>Forma</th>
+                      <th class="num sortable th-presenca" data-sort="presenca">📅 %</th>
+                      <th>Últimos 5 jogos</th>
                     </tr>
                   </thead>
                   <tbody></tbody>
@@ -211,6 +300,11 @@
       </div>
     </section>
 
+    <!-- ════════════ RECORDES ════════════ -->
+    <section id="tab-recordes" class="tab-panel">
+      <div id="recordes-content" class="rec-outer"></div>
+    </section>
+
     <!-- ════════════ SOBRE ════════════ -->
     <section id="tab-sobre" class="tab-panel">
       <div class="prose-panel">
@@ -276,7 +370,52 @@
     <div class="sheet-body" id="sheet-filtros-body"></div>
   </div>
 
+  <div class="mobile-sheet" id="sheet-partidas-temporada">
+    <div class="sheet-handle"></div>
+    <h3 class="sheet-title">📅 Temporada — Partidas</h3>
+    <div class="sheet-body" id="sheet-partidas-temporada-body"></div>
+  </div>
+
   <script src="data.js"></script>
-  <script src="app_v2.js?v=12"></script>
+  <script src="app_v2.js?v=15"></script>
+
+  <!-- Esconde o overlay após a inicialização da app -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var overlay = document.getElementById('loading-overlay');
+      if (!overlay) return;
+      overlay.classList.add('hidden');
+      setTimeout(function () { overlay.remove(); }, 400);
+    });
+  </script>
+
+  <!-- Dark mode toggle logic -->
+  <script>
+    (function () {
+      var btn = document.getElementById('dark-toggle');
+      var html = document.documentElement;
+
+      function isDark() { return html.classList.contains('dark'); }
+
+      function applyTheme(dark) {
+        html.classList.toggle('dark',  dark);
+        html.classList.toggle('light', !dark);
+        btn.textContent = dark ? '☀️' : '🌙';
+        btn.title       = dark ? 'Mudar para modo claro' : 'Mudar para modo escuro';
+        localStorage.setItem('pelada-theme', dark ? 'dark' : 'light');
+      }
+
+      // Sincroniza ícone com o tema já aplicado pelo script do <head>
+      btn.textContent = isDark() ? '☀️' : '🌙';
+      btn.title       = isDark() ? 'Mudar para modo claro' : 'Mudar para modo escuro';
+
+      btn.addEventListener('click', function () { applyTheme(!isDark()); });
+
+      // Atualiza se o sistema mudar (apenas quando não há preferência manual)
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+        if (!localStorage.getItem('pelada-theme')) applyTheme(e.matches);
+      });
+    })();
+  </script>
 </body>
 </html>
