@@ -2,6 +2,7 @@
 'use strict';
 
 let DATA = null;
+let _h2hExtraRows = []; // cache das linhas extras do histórico H2H
 
 const MESES_PT = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -239,6 +240,12 @@ function onHashChange() {
 function activateTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+  // Destaques visível apenas em Rankings e Recordes
+  const dest = document.getElementById('destaques-section');
+  if (dest) {
+    const hideOn = ['jogadores', 'partidas', 'comparar'];
+    dest.style.display = hideOn.includes(tab) ? 'none' : '';
+  }
 }
 
 // ══════════════════════════════════════
@@ -474,6 +481,12 @@ function setupTabs() {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      // Destaques: esconder em jogadores, partidas e comparar
+      const dest = document.getElementById('destaques-section');
+      if (dest) {
+        const hideOn = ['jogadores', 'partidas', 'comparar'];
+        dest.style.display = hideOn.includes(btn.dataset.tab) ? 'none' : '';
+      }
       pushHash();
       if (isMobile()) updateMobileBar();
     });
@@ -1993,7 +2006,9 @@ function computeH2H(nome1, nome2, anoFiltro) {
 
   const r = { total: comuns.length, mesmo_time: 0, opostos: 0,
               j1: {v:0,e:0,d:0,pts:0,gols:0,assists:0},
-              j2: {v:0,e:0,d:0,pts:0,gols:0,assists:0} };
+              j2: {v:0,e:0,d:0,pts:0,gols:0,assists:0},
+              mt: {v:0,e:0,d:0,pts:0,j1_gols:0,j1_assists:0,j2_gols:0,j2_assists:0},
+              partidas_juntos: [] };
 
   for (const dt of comuns) {
     const p1 = map1.get(dt), p2 = map2.get(dt);
@@ -2001,12 +2016,18 @@ function computeH2H(nome1, nome2, anoFiltro) {
     r.j1.assists += p1.assists; r.j2.assists += p2.assists;
     const t1 = p1.time || '';
     const t2 = p2.time || '';
+    let res1 = '', res2 = '';
     if (!t1 || !t2 || t1 === t2) {
       r.mesmo_time++;
+      const mres = p1.resultado || deduceResultado(p1) || p2.resultado || deduceResultado(p2);
+      r.mt.v += mres==='V'?1:0; r.mt.e += mres==='E'?1:0; r.mt.d += mres==='D'?1:0;
+      r.mt.pts += (mres==='V'?3:mres==='E'?1:0);
+      r.mt.j1_gols += p1.gols; r.mt.j1_assists += p1.assists;
+      r.mt.j2_gols += p2.gols; r.mt.j2_assists += p2.assists;
     } else {
       r.opostos++;
-      let res1 = p1.resultado || deduceResultado(p1);
-      let res2 = p2.resultado || deduceResultado(p2);
+      res1 = p1.resultado || deduceResultado(p1);
+      res2 = p2.resultado || deduceResultado(p2);
       if (!res1 && res2) res1 = res2==='V'?'D':res2==='D'?'V':'E';
       if (!res2 && res1) res2 = res1==='V'?'D':res1==='D'?'V':'E';
       const opp = {'V':'D','D':'V','E':'E'};
@@ -2021,7 +2042,15 @@ function computeH2H(nome1, nome2, anoFiltro) {
       r.j2.v += res2==='V'?1:0; r.j2.e += res2==='E'?1:0;
       r.j2.d += res2==='D'?1:0; r.j2.pts += (res2==='V'?3:res2==='E'?1:0);
     }
+    r.partidas_juntos.push({
+      data: dt,
+      placar_p: p1.placar_p, placar_b: p1.placar_b,
+      p1_time: t1, p1_gols: p1.gols, p1_assists: p1.assists, p1_res: res1,
+      p2_time: t2, p2_gols: p2.gols, p2_assists: p2.assists, p2_res: res2,
+      mesmo_time: !t1 || !t2 || t1 === t2
+    });
   }
+  r.partidas_juntos.sort((a, b) => b.data.localeCompare(a.data));
   return r;
 }
 
@@ -2046,60 +2075,98 @@ function renderH2H(nome1, nome2, anoFiltro) {
   const g2  = (ano && DATA.jogadores[nome2].por_ano[ano]) ? DATA.jogadores[nome2].por_ano[ano] : DATA.jogadores[nome2].geral;
   const h2h = computeH2H(nome1, nome2, anoFiltro);
 
-  function pct(v1, v2) {
-    const t = v1 + v2;
-    if (t === 0) return [50, 50];
-    return [Math.round(v1 / t * 100), Math.round(v2 / t * 100)];
-  }
-
-  function brow(lbl, v1, v2, sfx, higher) {
-    if (higher === undefined) higher = true;
-    const [p1, p2] = pct(+v1, +v2);
-    const j1w = higher ? +v1 > +v2 : +v1 < +v2;
-    const j2w = higher ? +v2 > +v1 : +v2 < +v1;
-    const c1 = j1w ? ' win' : ''; const c2 = j2w ? ' win' : '';
-    const d1 = sfx ? v1 + sfx : v1; const d2 = sfx ? v2 + sfx : v2;
+  function brow(label, v1, v2, suffix) {
+    suffix = suffix || '';
+    const n1 = parseFloat(v1) || 0, n2 = parseFloat(v2) || 0;
+    const mx = Math.max(n1, n2) || 1;
+    const p1 = Math.round(n1 / mx * 100);
+    const p2 = Math.round(n2 / mx * 100);
+    const w1 = n1 >= n2 && n1 > 0 ? ' win' : '';
+    const w2 = n2 >= n1 && n2 > 0 ? ' win' : '';
     return `<div class="h2h-brow">
-      <span class="h2h-bval left${c1}">${d1}</span>
-      <div class="h2h-bhalf left"><div class="h2h-bfill${c1}" style="width:${p1}%"></div></div>
-      <span class="h2h-blbl">${lbl}</span>
-      <div class="h2h-bhalf right"><div class="h2h-bfill${c2}" style="width:${p2}%"></div></div>
-      <span class="h2h-bval right${c2}">${d2}</span>
+      <div class="h2h-bval left${w1 ? ' win' : ''}">${v1}${suffix}</div>
+      <div class="h2h-bhalf left"><div class="h2h-bfill${w1}" style="width:${p1}%"></div></div>
+      <div class="h2h-blbl">${label}</div>
+      <div class="h2h-bhalf right"><div class="h2h-bfill${w2}" style="width:${p2}%"></div></div>
+      <div class="h2h-bval right${w2 ? ' win' : ''}">${v2}${suffix}</div>
     </div>`;
   }
 
   const noJogos = h2h.total === 0;
 
-  el.innerHTML = `
-    <div class="h2h-panel">
-      <div class="h2h-header">
-        <span class="h2h-pname left">${nome1}</span>
-        <span class="h2h-vsbadge">⚔️ vs</span>
-        <span class="h2h-pname right">${nome2}</span>
-      </div>
-      <p class="h2h-sec-lbl">Estatísticas gerais</p>
-      ${brow('jogos',    g1.jogos,          g2.jogos)}
-      ${brow('pontos',   g1.pontos,         g2.pontos)}
-      ${brow('aprov. %', g1.aproveitamento, g2.aproveitamento, '%')}
-      ${brow('gols',     g1.gols,           g2.gols)}
-      ${brow('assists',  g1.assists,        g2.assists)}
-      ${brow('g+a',      g1.g_a,            g2.g_a)}
-      <hr class="h2h-divider">
-      ${noJogos
-        ? '<p class="h2h-empty">Esses jogadores nunca jogaram juntos.</p>'
-        : `<div class="h2h-together">
-            <span>Jogaram em <strong>${h2h.total}</strong> partidas juntos</span>
-            <span>Mesmo time: <strong>${h2h.mesmo_time}</strong></span>
-            <span>Frente a frente: <strong>${h2h.opostos}</strong></span>
-           </div>
-           ${h2h.opostos > 0 ? `
-           <p class="h2h-sec-lbl" style="margin-top:14px">Frente a frente — ${h2h.opostos} partidas</p>
-           ${brow('vitórias', h2h.j1.v,   h2h.j2.v)}
-           ${brow('empates',  h2h.j1.e,   h2h.j2.e)}
-           ${brow('pontos',   h2h.j1.pts, h2h.j2.pts)}
-           ${brow('gols',     h2h.j1.gols,h2h.j2.gols)}
-           ` : ''}`}
+  // Together summary
+  let togetherHTML = '';
+  if (!noJogos) {
+    togetherHTML = `<div class="h2h-together">
+      Jogaram em <strong>${h2h.total} partidas</strong> juntos
+      <span>Mesmo time: <strong>${h2h.mesmo_time}</strong></span>
+      <span>Frente a frente: <strong>${h2h.opostos}</strong></span>
     </div>`;
+  }
+
+  // Frente a frente
+  let directHTML = '';
+  if (h2h.opostos > 0) {
+    const aprov1 = (h2h.j1.pts / (h2h.opostos * 3) * 100).toFixed(1);
+    const aprov2 = (h2h.j2.pts / (h2h.opostos * 3) * 100).toFixed(1);
+    directHTML = `
+      <hr class="h2h-divider">
+      <div class="h2h-sec-lbl">Frente a frente — ${h2h.opostos} partidas</div>
+      ${brow('Vitórias', h2h.j1.v, h2h.j2.v)}
+      ${brow('Empates',  h2h.j1.e, h2h.j2.e)}
+      ${brow('Pontos',   h2h.j1.pts, h2h.j2.pts)}
+      ${brow('Gols',     h2h.j1.gols, h2h.j2.gols)}`;
+  }
+
+  // Como dupla
+  let duoHTML = '';
+  if (h2h.mesmo_time > 0) {
+    const mt = h2h.mt;
+    const mtTotal = mt.v + mt.e + mt.d || 1;
+    const mtAprov = (mt.pts / (mtTotal * 3) * 100).toFixed(1);
+    duoHTML = `
+      <hr class="h2h-divider">
+      <div class="h2h-sec-lbl">Como dupla — ${h2h.mesmo_time} partidas no mesmo time</div>
+      <div class="h2h-duo-cards">
+        <div class="h2h-duo-card v"><div class="h2h-duo-num">${mt.v}</div><div class="h2h-duo-lbl">vitórias</div></div>
+        <div class="h2h-duo-card"><div class="h2h-duo-num">${mt.e}</div><div class="h2h-duo-lbl">empates</div></div>
+        <div class="h2h-duo-card d"><div class="h2h-duo-num">${mt.d}</div><div class="h2h-duo-lbl">derrotas</div></div>
+        <div class="h2h-duo-card"><div class="h2h-duo-num">${mtAprov}%</div><div class="h2h-duo-lbl">aproveit.</div></div>
+      </div>
+      <div style="margin-top:12px">
+        <div class="h2h-sec-lbl">Contribuição individual</div>
+        ${brow('Gols',    mt.j1_gols,    mt.j2_gols)}
+        ${brow('Assists', mt.j1_assists, mt.j2_assists)}
+      </div>`;
+  }
+
+  el.innerHTML = noJogos
+    ? `<div class="h2h-panel"><div class="h2h-empty">Esses jogadores nunca jogaram juntos no período selecionado.</div></div>`
+    : `<div class="h2h-panel">
+        <div class="h2h-header">
+          <div class="h2h-pname left">${escapeHtml(nome1)}<span class="sub">${g1.jogos} jogos</span></div>
+          <div class="h2h-vsbadge">⚔ vs</div>
+          <div class="h2h-pname right">${escapeHtml(nome2)}<span class="sub">${g2.jogos} jogos</span></div>
+        </div>
+        <div class="h2h-sec-lbl">Estatísticas gerais</div>
+        ${brow('Jogos',   g1.jogos,          g2.jogos)}
+        ${brow('Pontos',  g1.pontos,         g2.pontos)}
+        ${brow('Aprov. %', g1.aproveitamento, g2.aproveitamento, '%')}
+        ${brow('Gols',    g1.gols,           g2.gols)}
+        ${brow('Assists', g1.assists,        g2.assists)}
+        ${brow('G+A',     g1.g_a,            g2.g_a)}
+        <hr class="h2h-divider">
+        ${togetherHTML}
+        ${directHTML}
+        ${duoHTML}
+      </div>`;
+}
+
+function h2hShowMore(btn) {
+  const list = document.getElementById('h2h-history-list');
+  if (!list) return;
+  list.insertAdjacentHTML('beforeend', _h2hExtraRows.join(''));
+  if (btn) btn.remove();
 }
 
 function renderRecordes() {
@@ -2301,16 +2368,23 @@ function renderSobre() {
 //  Util
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 function formatDataBR(iso) {
-  if (!iso) return '\u2014';
+  if (!iso) return '—';
   const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
+    return `${d}/${m}/${y}`;
 }
-function escapeAttr(s) {
-  if (s == null) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c =>
-    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;',
-    "'":'&#39;' }[c]));
+function escapeAttr(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;');
 }
