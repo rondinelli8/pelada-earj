@@ -1934,6 +1934,74 @@ function renderPartidas() {
   pushHash();
 }
 
+// ══════════════════════════════════════
+//  Mapa de posições — ordenação nos cards
+// ══════════════════════════════════════
+const POS_ORDEM = { 'GK': 0, 'ZAG': 1, 'LAT': 2, 'MEI': 3, 'ATA': 4, 'EXT': 5 };
+const POSICOES = {
+  // GK
+  'Santos (Goleiro)':          'GK',
+  'Santos':                    'GK',
+  'Thiago Oliveira (Goleiro)': 'GK',
+  'Thiago Oliveira':           'GK',
+  'João Azevedo (Goleiro)':    'GK',
+  'Adriano de Jesus (Goleiro)':'GK',
+  'Eryk de Oliveira (Goleiro)':'GK',
+  'João Vitor':                'GK',
+  'João Victor Orelha':        'GK',
+  // ZAG
+  'Marcelo Kasper':    'ZAG',
+  'Vitor Lucena':      'ZAG',
+  'Marcelo Fabregas':  'ZAG',
+  'Vitor Freitas':     'ZAG',
+  'Fabricio Lourenço': 'ZAG',
+  'Israel':            'ZAG',
+  'Arcleidson Soares': 'ZAG',
+  'Tiago Timm':        'ZAG',
+  'Nicolau Villa Lobos':'ZAG',
+  'Caio Kuhner':       'ZAG',
+  // LAT
+  'Marcelo Conduru':    'LAT',
+  'Thiago Gueiros':     'LAT',
+  'Gabriel Sauer':      'LAT',
+  'João Saraiva':       'LAT',
+  'João Pedro Salgueiro':'LAT',
+  'Felipe Zarur':       'LAT',
+  'Andre Lo Fiego':     'LAT',
+  'George Lima':        'LAT',
+  'Luca Tremonti':      'LAT',
+  'Gegge':              'LAT',
+  // MEI
+  'Aderbal':           'MEI',
+  'Antoine Demay':     'MEI',
+  'Joaquim Mariani':   'MEI',
+  'Rodrigo Prado':     'MEI',
+  'Rafael Rondinelli': 'MEI',
+  'Marcio Penna':      'MEI',
+  'Antonio Pu':        'MEI',
+  'Antonio Correa':    'MEI',
+  'Pedro Amaral':      'MEI',
+  'Rodrigo Faveret':   'MEI',
+  'Felipe Novaes':     'MEI',
+  'Guilherme Cazorla': 'MEI',
+  'Pedro Viegas':      'MEI',
+  'Plinio Barbosa':    'MEI',
+  'Rafael Tabet':      'MEI',
+  'Lucas Valente':     'MEI',
+  'Antonio Luiz Rocha':'MEI',
+  'Lucas (Castelo)':   'MEI',
+  'Mauricio Silva':    'MEI',
+  'Paulo Freire':      'MEI',
+  'Lucas Leal':        'MEI',
+  // ATA
+  'Cereja':            'ATA',
+  'Pedro Carsalade':   'ATA',
+  'Pedro Wright':      'ATA',
+  'Guilherme Macedo':  'ATA',
+  'Patrick Scheloto':  'ATA',
+  // Jogadores não listados aqui → EXT (aparecem por último)
+};
+
 function renderPartidaCard(p) {
   const times = Object.keys(p.times);
   const ordem = ['Preto', 'Branco', ...times.filter(t => t !== 'Preto' && t !== 'Branco')];
@@ -1959,14 +2027,21 @@ function renderPartidaCard(p) {
     timesOrd.map(t => {
       const jogadores = p.times[t]
         .slice()
-        .sort((a, b) => (b.gols + b.assists) - (a.gols + a.assists) || a.nome.localeCompare(b.nome, 'pt-BR'))
+        .sort((a, b) => {
+          const posA = POS_ORDEM[POSICOES[a.nome] ?? 'EXT'] ?? 5;
+          const posB = POS_ORDEM[POSICOES[b.nome] ?? 'EXT'] ?? 5;
+          if (posA !== posB) return posA - posB;
+          return (b.gols + b.assists) - (a.gols + a.assists) || a.nome.localeCompare(b.nome, 'pt-BR');
+        })
         .map(j => {
           const tags = [];
           if (j.gols)    tags.push(`<span class="stat-icon">\u26BD${j.gols > 1 ? ' '+j.gols : ''}</span>`);
           if (j.assists) tags.push(`<span class="stat-icon">\uD83D\uDC5F${j.assists > 1 ? ' '+j.assists : ''}</span>`);
           const tagStr = tags.length ? `<span class="stat-tags">${tags.join('')}</span>` : '';
+          const isGK = POSICOES[j.nome] === 'GK';
+          const gkBadge = isGK ? '<span class="gk-badge">GK</span>' : '';
           return `<li data-jogador="${escapeAttr(j.nome)}" class="clickable">
-                    <span class="jog-nome">${escapeHtml(j.nome.replace(' (Goleiro)', ''))}</span>${tagStr}
+                    <span class="jog-nome">${escapeHtml(j.nome.replace(' (Goleiro)', ''))}${gkBadge}</span>${tagStr}
                   </li>`;
         }).join('');
       return `<div class="time-col">

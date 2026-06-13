@@ -677,6 +677,23 @@ input[type="search"]:focus {
 .badge-preto { background: var(--preto-bg); color: var(--preto-fg); }
 .badge-branco { background: var(--branco-bg); color: var(--branco-fg); border: 1px solid var(--border); }
 
+/* Badge GK nos cards de partida */
+.gk-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 1px 5px;
+  border-radius: var(--radius-pill);
+  background: var(--muted);
+  color: var(--text-secondary);
+  margin-left: 6px;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
 /* ─── Partidas ─── */
 .mes-grupo { margin-bottom: 36px; }
 .mes-header {
