@@ -657,7 +657,7 @@ function setupLimiteFilter() {
 //  Render Ranking
 // ══════════════════════════════════════
 function formDots(partidas, n = 5) {
-  return (partidas || []).slice(0, n).map(p => {
+  return (partidas || []).slice(0, n).reverse().map(p => {
     const cls = p.resultado === 'V' ? 'dot-v' : p.resultado === 'E' ? 'dot-e' : 'dot-d';
     return `<span class="form-dot ${cls}" title="${formatDataBR(p.data)}">${p.resultado}</span>`;
   }).join('');
@@ -2051,8 +2051,15 @@ function renderPartidaCard(p) {
     }).join('')
   }</div>`;
 
+  const arbitroHtml = p.arbitro
+    ? `<span class="partida-arbitro">${escapeHtml(p.arbitro)}</span>`
+    : '';
+
   return `<article class="partida-card-v2">
-    <div class="partida-data-v2">${formatDataBR(p.data)}</div>
+    <div class="partida-header-v2">
+      <div class="partida-data-v2">${formatDataBR(p.data)}</div>
+      ${arbitroHtml}
+    </div>
     ${placarHtml}
     ${escalacaoHtml}
   </article>`;
