@@ -628,6 +628,7 @@ function syncLimitePills() {
 
 function setupMetricaFilter() {
   const wrap = document.getElementById('filter-metrica');
+  if (!wrap) return;
   wrap.addEventListener('click', e => {
     const b = e.target.closest('button[data-metrica]');
     if (!b) return;
@@ -966,20 +967,6 @@ function renderSheetFiltros() {
     { k: 'goleiros', label: '🧤 Goleiros'  },
     { k: 'corrida',  label: '🏁 Corrida'   },
   ];
-  const grupos = [
-    { label: 'Desempenho', items: [
-      { k: 'pontos',             label: '🏆 Pontos'     },
-      { k: 'aproveitamento',     label: '📈 Aproveit.'  },
-      { k: 'aproveitamento_pior',label: '📉 Pior Aprov.'},
-      { k: 'jogos',              label: '🏟️ Jogos'      },
-    ]},
-    { label: 'Ataque', items: [
-      { k: 'gols',     label: '⚽ Gols'   },
-      { k: 'assists',  label: '👟 Assists' },
-      { k: 'g_a',      label: '🎯 G+A'   },
-      { k: 'g_a_jogo', label: '🎯 G+A/J' },
-    ]},
-  ];
   const limites = [
     { v: 10, label: 'Top 10' },
     { v: 20, label: 'Top 20' },
@@ -995,16 +982,6 @@ function renderSheetFiltros() {
         `).join('')}
       </div>
     </div>
-    ${grupos.map(g => `
-      <div class="sheet-section">
-        <div class="sheet-section-label">${g.label}</div>
-        <div class="sheet-pill-row">
-          ${g.items.map(it => `
-            <button class="sheet-pill${STATE.ranking.metrica === it.k ? ' active' : ''}" data-metrica="${it.k}">${it.label}</button>
-          `).join('')}
-        </div>
-      </div>
-    `).join('')}
     <div class="sheet-section">
       <div class="sheet-section-label">Mostrar</div>
       <div class="sheet-pill-row">
@@ -1771,25 +1748,29 @@ function buildPartidasSidebar() {
 
   const anos = [...DATA.meta.anos_disponiveis.slice().reverse().map(String)];
 
-  // Meses disponíveis por ano
+  // Meses disponíveis e contagem de partidas por ano
   const mesesPorAno = {};
+  const partidasPorAno = {};
   DATA.partidas.forEach(p => {
     const a = String(p.ano);
     const m = p.data.slice(5, 7);
     if (!mesesPorAno[a]) mesesPorAno[a] = new Set();
     mesesPorAno[a].add(m);
+    partidasPorAno[a] = (partidasPorAno[a] || 0) + 1;
   });
+  const totalPartidas = DATA.partidas.length;
 
   const todosItem = `
     <div class="sidebar-year-item">
       <button class="sidebar-year-btn ${STATE.partidas.ano === 'todos' ? 'active' : ''}" data-ano="todos">
         <span class="chevron">—</span>
-        <span>Todos</span>
+        <span>Todos</span> <span class="sidebar-year-count">· ${totalPartidas}j</span>
       </button>
     </div>`;
 
   const anosItems = anos.map(a => {
     const isActive = STATE.partidas.ano === a;
+    const count = partidasPorAno[a] || 0;
     const meses = mesesPorAno[a] ? [...mesesPorAno[a]].sort().reverse() : [];
     const mesesBtns = [
       `<button class="sidebar-sub-btn ${isActive && STATE.partidas.mes === 'todos' ? 'active' : ''}"
@@ -1805,7 +1786,7 @@ function buildPartidasSidebar() {
       <div class="sidebar-year-item">
         <button class="sidebar-year-btn ${isActive ? 'active' : ''}" data-ano="${a}">
           <span class="chevron">${isActive ? '▾' : '▸'}</span>
-          <span>${a}</span>
+          <span>${a}</span> <span class="sidebar-year-count">· ${count}j</span>
         </button>
         <div class="sidebar-year-sub ${isActive ? 'open' : ''}">
           ${mesesBtns}
