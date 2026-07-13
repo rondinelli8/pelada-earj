@@ -1898,16 +1898,32 @@ function renderPartidas() {
     return `
       <div class="mes-grupo">
         <div class="mes-header">
-          <span class="mes-label">${mesLabel}</span>
+          <button class="mes-toggle" data-mes-key="${key}">
+            <span class="mes-chevron">▾</span>
+            <span class="mes-label">${mesLabel}</span>
+          </button>
           <span class="mes-count">${partidas.length} partida${partidas.length > 1 ? 's' : ''}</span>
         </div>
-        <div class="partidas-list-mes">
+        <div class="partidas-list-mes" data-mes-body="${key}">
           ${partidas.map(p => renderPartidaCard(p)).join('')}
         </div>
       </div>`;
   }).join('');
 
   wrap.onclick = e => {
+    // Toggle mês collapse/expand
+    const toggleBtn = e.target.closest('.mes-toggle');
+    if (toggleBtn) {
+      const key = toggleBtn.dataset.mesKey;
+      const body = wrap.querySelector(`[data-mes-body="${key}"]`);
+      if (body) {
+        const collapsed = body.classList.toggle('collapsed');
+        const chevron = toggleBtn.querySelector('.mes-chevron');
+        if (chevron) chevron.textContent = collapsed ? '▸' : '▾';
+      }
+      return;
+    }
+
     const li = e.target.closest('li[data-jogador]');
     if (li) abrirJogador(li.dataset.jogador);
   };
@@ -1930,6 +1946,7 @@ const POSICOES = {
   'Eryk de Oliveira (Goleiro)':'GK',
   'João Vitor':                'GK',
   'João Victor Orelha':        'GK',
+  'João Victor Orelha (Goleiro)': 'GK',
   // ZAG
   'Marcelo Kasper':    'ZAG',
   'Vitor Lucena':      'ZAG',
@@ -1991,15 +2008,19 @@ function renderPartidaCard(p) {
   const placarHtml = (timesOrd.includes('Preto') || timesOrd.includes('Branco'))
     ? `<div class="placar-v2">
         <div class="placar-team">
-          <span class="badge-circle preto"></span>
-          <span class="placar-nome">Preto</span>
+          <span class="placar-label">
+            <span class="badge-circle preto"></span>
+            <span class="placar-nome">PRETO</span>
+          </span>
           <span class="placar-score">${p.placar_p ?? '\u2014'}</span>
         </div>
         <span class="placar-sep">\u00D7</span>
         <div class="placar-team placar-team-right">
           <span class="placar-score">${p.placar_b ?? '\u2014'}</span>
-          <span class="placar-nome">Branco</span>
-          <span class="badge-circle branco"></span>
+          <span class="placar-label">
+            <span class="placar-nome">BRANCO</span>
+            <span class="badge-circle branco"></span>
+          </span>
         </div>
       </div>`
     : '';
@@ -2032,8 +2053,11 @@ function renderPartidaCard(p) {
     }).join('')
   }</div>`;
 
-  const arbitroHtml = p.arbitro
-    ? `<span class="partida-arbitro">${escapeHtml(p.arbitro)}</span>`
+  const juizPlayers = p.times['Juiz'] || [];
+  const arbitroNome = p.arbitro
+    || (juizPlayers.length ? juizPlayers[0].nome.replace(' (Juiz)', '').replace(' JUIZ', '') : '');
+  const arbitroHtml = arbitroNome
+    ? `<span class="partida-arbitro-v2">${escapeHtml(arbitroNome)}</span>`
     : '';
 
   return `<article class="partida-card-v2">

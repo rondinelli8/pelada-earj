@@ -698,12 +698,31 @@ input[type="search"]:focus {
 .mes-grupo { margin-bottom: 36px; }
 .mes-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
   padding-bottom: 10px;
   border-bottom: 2px solid var(--border);
 }
+
+.mes-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.mes-toggle:hover .mes-label { color: var(--accent); }
+.mes-toggle:hover .mes-chevron { color: var(--accent); }
+
+.mes-chevron {
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: color 0.15s;
+}
+
 .mes-label {
   font-size: 15px;
   font-weight: 700;
@@ -720,6 +739,9 @@ input[type="search"]:focus {
 @media (min-width: 700px) {
   .partidas-list-mes { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* Collapsed = escondido */
+.partidas-list-mes.collapsed { display: none; }
 
 /* Partida card v2 */
 .partida-card-v2 {
@@ -744,16 +766,16 @@ input[type="search"]:focus {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
+  margin-bottom: 12px;
 }
-.partida-arbitro {
-  display: inline-flex;
-  align-items: center;
+.partida-header-v2 .partida-data-v2 { margin-bottom: 0; }
+
+.partida-arbitro-v2 {
   font-size: 10.5px;
   font-weight: 600;
   color: var(--text-muted);
-  letter-spacing: 0.03em;
 }
-.partida-arbitro::before {
+.partida-arbitro-v2::before {
   content: '';
   display: inline-block;
   width: 14px;
@@ -779,12 +801,17 @@ input[type="search"]:focus {
 .placar-team {
   display: flex;
   align-items: center;
-  gap: 7px;
   flex: 1;
 }
 .placar-team-right {
   justify-content: flex-end;
-  flex-direction: row-reverse;
+}
+.placar-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  justify-content: center;
 }
 .placar-nome {
   font-size: 12px;
