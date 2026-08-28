@@ -1947,6 +1947,8 @@ const POSICOES = {
   'João Vitor':                'GK',
   'João Victor Orelha':        'GK',
   'João Victor Orelha (Goleiro)': 'GK',
+  'Leandro Santiago (Goleiro)': 'GK',
+  'Leandro Santiago':          'GK',
   // ZAG
   'Marcelo Kasper':    'ZAG',
   'Vitor Lucena':      'ZAG',
@@ -1963,6 +1965,7 @@ const POSICOES = {
   'Thiago Gueiros':     'LAT',
   'Gabriel Sauer':      'LAT',
   'João Saraiva':       'LAT',
+  'João Pedro Saraiva': 'LAT',
   'João Pedro Salgueiro':'LAT',
   'Felipe Zarur':       'LAT',
   'Andre Lo Fiego':     'LAT',
