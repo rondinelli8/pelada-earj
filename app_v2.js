@@ -2000,6 +2000,7 @@ const POSICOES = {
   'Pedro Wright':      'ATA',
   'Guilherme Macedo':  'ATA',
   'Patrick Scheloto':  'ATA',
+  'Patrick Sacchetto': 'ATA',
   // Jogadores não listados aqui → EXT (aparecem por último)
 };
 
